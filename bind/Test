@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -e -o pipefail
+trap 'echo 1>&2 FAILED; exit 1' 0
+
+die() { echo 1>&2 "$(basename "$0"):" "$@"; exit 1; }
+
+base=$(cd "$(dirname "$0")" && pwd -P)
+cd $base
+sudo -v || die 'Cannot sudo to run docker'
+docker='sudo docker'
+
+#   We always build a test image; it's tagged :latest by hand.
+image=capps-bind:test
+
+[[ $1 = -n ]] || $docker build -t $image -q .
+
+version=$($docker run --rm --detach=false $image -v)
+[[ $version = 'BIND 9'* ]] || die "FAIL: unexpected version: $version"
+
+trap '' 0
+echo OK

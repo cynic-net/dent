@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -e -o pipefail
+
+die() { echo 1>&2 "$(basename "$0"):" "$@"; exit 1; }
+
+base=$(cd "$(dirname "$0")" && pwd -P)
+cd $base
+sudo -v || die 'Cannot sudo to run docker'
+docker='sudo docker'
+
+image=capps-bind:latest
+port=53
+[[ $1 == -T ]] && {
+    # Test mode; you may also want to add --detach=false to the command line
+    shift
+    image=capps-bind:test
+    port=1053
+}
+
+$docker run --detach=true \
+    -p $port:53 -p $port:53/udp \
+    "$@" $image
