@@ -14,7 +14,7 @@ image=capps-bind:test
 
 [[ $1 = -n ]] || $docker build -t $image -q .
 
-version=$($docker run --rm --detach=false $image -v)
+version=$(./capps-named -T --rm --detach=false -- -v)
 [[ $version = 'BIND 9'* ]] || die "FAIL: unexpected version: $version"
 
 trap '' 0

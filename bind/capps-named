@@ -10,13 +10,17 @@ docker='sudo docker'
 
 image=capps-bind:latest
 port=53
-[[ $1 == -T ]] && {
-    # Test mode; you may also want to add --detach=false to the command line
-    shift
-    image=capps-bind:test
-    port=1053
-}
+dockerargs=()
+while true; do case "$1" in
+    -T)     #   Test mode; you may want to add --detach=false
+            shift; image=capps-bind:test; port=1053
+            ;;
+    --)     shift; break;;              # named args follow
+    '')     break;;
+    *)      dockerargs+=($1); shift;;
+esac; done
 
-$docker run --detach=true \
+#   XXX Always using --rm means we need to move logs outside container.
+$docker run --rm --detach=true \
     -p $port:53 -p $port:53/udp \
-    "$@" $image
+    "${dockerargs[@]}" $image "$@"
