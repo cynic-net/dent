@@ -9,9 +9,14 @@ sudo -v || die 'Cannot sudo to run docker'
 docker='sudo docker'
 
 image=capps-bind:latest
+configdir=/etc/bind         # Uses named.conf in this dir
 port=53
 dockerargs=()
 while true; do case "$1" in
+    -C)     #   -C <configdir>
+            shift; configdir="$1"; shift;
+            [[ $configdir = /* ]] || die '-C configdir must start with /'
+            ;;
     -T)     #   Test mode; you may want to add --detach=false
             shift; image=capps-bind:test; port=1053
             ;;
@@ -22,5 +27,6 @@ esac; done
 
 #   XXX Always using --rm means we need to move logs outside container.
 $docker run --rm --detach=true \
+    -v $configdir:/etc/bind:ro \
     -p $port:53 -p $port:53/udp \
     "${dockerargs[@]}" $image "$@"
