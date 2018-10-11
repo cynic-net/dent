@@ -22,7 +22,7 @@ while true; do case "$1" in
             ;;
     --)     shift; break;;              # named args follow
     '')     break;;
-    *)      dockerargs+=($1); shift;;
+    *)      dockerargs+=("$1"); shift;;
 esac; done
 
 #   XXX Always using --rm means we need to move logs outside container.
