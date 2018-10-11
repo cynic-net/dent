@@ -4,6 +4,13 @@
 #
 #   Usage: caps-named [-C <configdir>] [-T] <docker-args> -- named-args
 #
+#   This binds /dev/log into the container so that programs using
+#   syslog will log to the system logs just as if they were not
+#   running in a container. (The log messages have no indication that
+#   the program was in a container.) The -L option additionally sends
+#   stdout/err to the systemd journal under the image and container
+#   name.
+#
 #   Handy Docker args:
 #     --rm=no           Keep container after exiting
 #     --detach=false    Show stdout instead of having to use `docker logs`
@@ -22,6 +29,7 @@ docker='sudo docker'
 
 image=capps-bind:latest
 configdir=/etc/bind         # Uses named.conf in this dir
+logopts=()
 port=53
 dockerargs=()
 while true; do case "$1" in
@@ -29,8 +37,13 @@ while true; do case "$1" in
             shift; configdir="$1"; shift;
             [[ $configdir = /* ]] || die '-C configdir must start with /'
             ;;
+    -L)     #   Log stdout/err to systemd journal; doesn't affect /dev/log
+            shift
+            logopts+=("--log-driver=journald")
+            logopts+=("--log-opt=tag={{.ImageName}}:{{.Name}}")
+            ;;
     -T)     #   Test mode; you may want to add --detach=false
-            shift; image=capps-bind:test; port=1053
+            shift; image=capps-bind:test; port=1053; namedargs=-g
             ;;
     --)     shift; break;;              # named args follow
     '')     break;;
@@ -39,6 +52,7 @@ esac; done
 
 #   XXX Always using --rm means we need to move logs outside container.
 $docker run --rm --detach=true \
+    "${logopts[@]}" -v /dev/log:/dev/log \
     -v $configdir:/etc/bind:ro \
     -p $port:53 -p $port:53/udp \
-    "${dockerargs[@]}" $image "$@"
+    "${dockerargs[@]}" $image $namedargs "$@"

@@ -7,4 +7,4 @@ EXPOSE 53 53/udp
 #   External mounts: databases, maybe log files?
 
 #   -g forces foreground run and logging to stderr
-ENTRYPOINT ["named", "-g"]
+ENTRYPOINT ["named", "-f"]
