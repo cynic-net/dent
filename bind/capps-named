@@ -1,4 +1,16 @@
 #!/usr/bin/env bash
+#
+#   capps-bind - start containerized named server
+#
+#   Usage: caps-named [-C <configdir>] [-T] <docker-args> -- named-args
+#
+#   Handy Docker args:
+#     --rm=no           Keep container after exiting
+#     --detach=false    Show stdout instead of having to use `docker logs`
+#     --name=foo        Set name of container
+#     --entrypoint=cmd  Run different command in container.
+#                       Only cmd here, args to it go after `--`.
+#
 set -e -o pipefail
 
 die() { echo 1>&2 "$(basename "$0"):" "$@"; exit 1; }
