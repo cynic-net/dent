@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+set -e -o pipefail
+trap 'echo 1>&2 FAILED; exit 1' 0
+
+die() { echo 1>&2 "FAILURE:" "$@"; exit 1; }
+
+errorlist=()
+adderror() { errorlist+=("$*"); }
+
+setup_docker() {
+    declare -g docker=docker
+    if ! $docker --version; then
+        die "Cannot run '$docker' command. Check path?"
+    elif ! $docker info >/dev/null 2>&1; then
+        docker='sudo docker'
+        sudo -v || die "Cannot sudo to run '$docker'; start proxy?"
+    fi
+}
+
+nonbuild_tests() {
+    #   We are probably ok using a single image name for multiple
+    #   (even simultaneous) test runs because the image never changes.
+    etest_image=dent/test/nonbuild
+    etest_container=dent-test-nonbuild.$$
+
+    echo '≡≡≡≡≡ Setup'
+    echo "Test image: $etest_image"
+    echo "Test container: $etest_container"
+    etest_image_sha=$(
+    echo '
+        FROM alpine:latest
+        CMD ["/bin/sleep", "10"]
+    ' | $docker build -q -t $etest_image -)
+    echo "Built test image as $etest_image_sha"
+
+    echo '≡≡≡≡≡ Pre-existing container tests'
+    #   The test container made from this image is run with --rm so it will
+    #   automatically clean itself up shortly, regardless of test status.
+    echo -n "docker rm $etest_container: "
+    $docker container rm -f $etest_container || true
+    echo -n "docker run --name $etest_container $etest_image: "
+    $docker run --rm --detach --name $etest_container $etest_image
+
+    echo '===== Exec in running container (stdin is terminal if Test is)'
+    output=$(./dent -q $etest_container /bin/echo -n etest 0100 </dev/tty) \
+        || die "exitcode=$? output='$output'"
+    [[ $output = 'etest 0100' ]] || die "bad output='$output'"
+    echo "ok output='$output'"
+
+    echo '===== Exec in running container (stdin not terminal)'
+    output=$(./dent -q $etest_container /bin/echo -n etest 0110 </dev/null) \
+        || die "exitcode=$? output='$output'"
+    [[ $output = 'etest 0110' ]] || die "bad output='$output'"
+    echo "ok output='$output'"
+
+    echo '===== Starts stopped container before exec'
+    echo -n "docker stop $etest_container: "
+    $docker stop -t 0 $etest_container  # Removes itself when stopped
+    echo -n "docker create $etest_container: "
+    $docker create --rm --name $etest_container $etest_image
+    output=$(./dent $etest_container /bin/echo -n etest 0120) \
+        || die "exitcode=$? output='$output'"
+    [[ $output = 'etest 0120' ]] || die "bad output='$output'"
+    echo "ok output='$output'"
+
+    $keep_images || {
+        echo -n "docker rmi $etest_image: "
+        $docker image rm -f "$etest_image" || true
+    }
+
+    echo '≡≡≡≡≡ Container creation from pre-existing image'
+    echo "docker rm -f $etest_container"
+    $docker rm -f $etest_container >/dev/null
+    exitcode=0; output=$(
+        ./dent -q -i alpine:latest $etest_container /bin/echo -n etest 0200
+        ) || exitcode=$?
+
+    echo '≡≡≡≡≡ Cleanup'
+    $docker rm -f $etest_container >/dev/null 2>&1 || true
+
+    [[ $exitcode -eq 0 ]] || die "exitcode=$? output='$output'"
+    [[ $output = 'etest 0200' ]] || die "bad output='$output'"
+    echo "ok output='$output'"
+}
+
+build_tests() {
+    #   Unless arguments are passed in to test specific base images, all
+    #   base images known to dent and viable on this platform are tested.
+    echo '≡≡≡≡≡ Builds from base images'
+
+    #   Certain very old images don't work on very new kernels.
+    kern_release=$(uname -r)
+    skip_images=()
+    if [[ $kern_release > 4.18 ]]; then
+        #   On ≤ centos:6, bash core dumps on 4.19, though works on 4.4.
+        skip_images+=(centos:5 centos:6)
+        echo "Kernel $kern_release: skipping images ${skip_images[@]}"
+    fi
+
+    declare -a baseimages=("$@")
+    [[ ${#baseimages} = 0 ]] && baseimages=($(./dent -l -))
+    for baseimage in "${baseimages[@]}"; do
+        for skip in "${skip_images[@]}"; do
+            [[ $baseimage = $skip ]] && {
+                echo "SKIP: $baseimage broken on $kern_release"
+                continue 2
+            }
+        done
+
+        tag=dent-test-$$
+        tag=dent-test       # DEBUG
+        image="dent-${baseimage/:/-}:$tag"  # duplicates code in dent
+        container="${image/:/-}"
+        echo "===== $baseimage"
+        echo "    Image: $image"
+        echo "Container: $container"
+
+        #   Also removes any containers based on this image, running or not.
+        echo -n "docker rmi -f $image: "
+        $docker image rm -f "$image" || true
+
+        #   This won't actually do a from-scratch rebuild if image has another
+        #   tag as well; the "cached" copy will be used.
+        ./dent --force-rebuild -B $baseimage -t $tag $container true \
+            || adderror $baseimage
+
+        echo -n "docker rm $container: "
+        $docker container rm -f "$container" || true
+        $keep_images || {
+            echo -n "docker rmi $image: "
+            $docker image rm -f "$image" || true
+        }
+    done
+
+    retcode=0
+    for e in "${errorlist[@]}"; do
+        echo "ERROR: $e"
+        retcode=$(($retcode+1))
+    done
+    [[ $retcode -eq 0 ]] || exit $retcode
+}
+
+skip() {
+    #   This differs from calling "nothing at all" with an empty
+    #   variable in that it accepts and ignores any arguments.
+    :
+}
+
+usage() {
+    [[ "$@" ]] && echo 1>&2 "$@"
+    sed -e 's/^        //' <<____ 1>&2
+        Usage: $0 [args] [base_image ...]
+        Options:
+            --skip-nonbuild
+            --skip-build
+            --keep-images
+____
+    exit 2
+}
+
+####################################################################
+#   Main
+
+base=$(cd "$(dirname "$0")" && pwd -P)
+cd $base
+. ./activate -q
+
+nonbuild_tests=nonbuild_tests
+build_tests=build_tests
+keep_images=false
+while true; do case "$1" in
+    -h|--help)          usage;;
+    --skip-nonbuild)    shift; nonbuild_tests=skip;;
+    --skip-build)       shift; build_tests=skip;;
+    --keep-images)      shift; keep_images=true;;
+    -*)                 usage "Unknown option '$1'";;
+    *)                  break;;
+esac; done
+
+setup_docker
+$nonbuild_tests
+$build_tests "$@"
+
+trap '' 0
+echo OK
