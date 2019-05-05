@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+#
+#   dockerd-proxy - start a proxy to a Docker daemon
+#
+#   In a secure installation, non-root users do not have access to the
+#   Docker daemon because anybody who has this access has full root
+#   access to the host. In such installations, anybody wanting to
+#   contact the daemon must sudo to do it.
+#
+#   In some situations programs that should not be run as root still
+#   need access to the daemon. This allows giving them this access in
+#   a slightly more secure way by setting up a proxy running as root
+#   that forwards requests to a socket owned by the user to the
+#   daemon. This still gives anybody with access to that socket full
+#   root access on the host, if they want to exploit that, but at
+#   least keeps these programs running as the regular user so as to
+#   avoid accidental accesses to things as root.
+#
+#   If the proxy is started, the appropriate `export DOCKER_HOST` line
+#   is printed to stdout; this command should be executed in all shell
+#   sessions that run programs needing to access the Docker daemon.
+#
+#   Bugs:
+#   - This should also have an option to stop the proxy. (Since there
+#     seems to be no easy way to get back the PID of the socat started
+#     by sudo, the easiest thing to do seems to be to look up the PID
+#     PID listening on $proxysock and sudo kill that.)
+#
+set -e -o pipefail
+
+proxysock=$HOME/.docker-proxy
+
+docker info >/dev/null 2>&1 && {
+    echo 1>&2 'Can already contact Docker daemon; proxy not (re-)started.'
+    exit 0
+    }
+
+export DOCKER_HOST="unix://$proxysock"
+docker info >/dev/null 2>&1 && {
+    #   Proxy already running
+    echo "export DOCKER_HOST=unix://$proxysock"
+    exit 0
+}
+
+sudo -v
+#   A previously-running socat using this socket should have
+#   removed it on exit, but this often doesn't seem to happen.
+rm -f "$proxysock"
+#   We don't daemonize or nohup this because, for security, we prefer
+#   it exits when the user logs out or exits that terminal session.
+sudo socat \
+    "UNIX-LISTEN:$proxysock,fork,user=$UID,mode=0700" \
+    "UNIX-CONNECT:/run/docker.sock" \
+    &
+echo "export DOCKER_HOST=unix://$proxysock"
