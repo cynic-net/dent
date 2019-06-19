@@ -91,9 +91,8 @@ as manual `docker` commands run by the user.
 
    If no container _CNAME_ exists, it must be created with `docker
    run`. To do this, either an existing image name must be supplied
-   with `-i IMAGE` or a base image from which to build an image (if
-   not already built) must be supplied with `-B BASE_IMAGE`. See below
-   for more on this.
+   with `-i IMAGE` or a new image built from a base image (`-B`) or
+   container (`-C`). See below for more on this.
 
    The command run in the container will be `/bin/sleep $((2^30))`; this
    will leave the container "running" but doing nothing. (Any work done
@@ -107,11 +106,12 @@ as manual `docker` commands run by the user.
 4. __Creating the Image__
 
    The name of the image is specified with `-i IMAGE`; if that is not
-   supplied a default name and tag is generated based on the base
-   image name given to `-B BASE_IMAGE` and the login name of the user
-   running `dent`. (The image tag may be overridden with `-t TAG`.) If
-   an image with that name does not exist, one will be built with a
-   configuration designed for interactive use as the user running `dent`.
+   supplied a default name is generated based on the base image name
+   given to `-B` or container name given to `-C` and tag from the
+   login name of the user running `dent`. (The image tag may be
+   overridden with `-t TAG`.) If an image with that name does not
+   exist, one will be built with a configuration designed for
+   interactive use as the user running `dent`.
 
    If the given image does exist, the `-R` or `--force-rebuild` flag can
    be used to untag that image and do a full image build, ignoring any

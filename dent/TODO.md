@@ -1,13 +1,25 @@
 To-do Lists
 ===========
 
+### This Branch
+
+- Create image from container.
+
+Issues:
+- How do we come up with a default name for the new image if `-i`
+  isn't specified? I was thinking it would be the container name, but
+  then I realized that when I use `-C` I probably want a new image
+  from the current container, not the image that was created a week
+  ago from the container, so it seems like `-C`, unlike `-B`, always
+  builds a new container. Perhaps add a timestamp to the name? Seems
+  inconvenient in certain ways.
+
 ### General
 
 - CMD is run in login env unless raw option given. (Concatenate
   command/args and pass to `bash -lc`.)
 - Add support for `docker exec` options `-u`, `-w`, `-e`, and maybe
   `--no-tty` and/or `-d`.
-- Create image from container.
 - Special tmate support because tmate needs a private key.
 - Support for detach and setting user, CWD, env vars with `docker exec`.
 - Further Docker config for container, e.g., bind mounts:
