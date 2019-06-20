@@ -20,6 +20,9 @@ To-do Lists
   option, but it would be nice to have a way for `dent` to remember the
   shell to use with a particular container. Perhaps Docker offers some
   per-image key-value storage we could use for this.
+- Add `-u, --user` option: containers created for/used as other users
+  (There's a fair amount to work out for this. What about uses who
+  don't exist in the host system? How to remember user for container?)
 - Would be nice to have image build logs stored somewhere rather than just
   spewed to stdtout.
 - Consider support for a container naming convention to help prevent
