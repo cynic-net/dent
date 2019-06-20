@@ -53,6 +53,12 @@ nonbuild_tests() {
     [[ $output = 'etest 0110' ]] || die "bad output='$output'"
     echo "ok output='$output'"
 
+    echo '===== Exec with shell option'
+    output=$(echo type cd | ./dent -q --shell sh $etest_container) \
+        || die "exitcode=$? output='$output'"
+    [[ $output = 'cd is a shell builtin' ]] || die "$LINENO bad output='$output'"
+    echo "ok output='$output'"
+
     echo '===== Starts stopped container before exec'
     echo -n "docker stop $etest_container: "
     $docker stop -t 0 $etest_container  # Removes itself when stopped

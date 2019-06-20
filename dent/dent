@@ -383,16 +383,18 @@ def main():
     p.add_argument('-R', '--force-rebuild', action='store_true',
         help='untag any existing image and rebuild it, ignoring cached images'
              " (only if container doesn't exist)")
+    p.add_argument('-s', '--shell', default='bash',
+        help='shell to use if not bash')
     p.add_argument('-t', '--tag',
         help="tag to use for image (default: username); cannot be used with -i")
     p.add_argument('--tmpdir', help='directory to use for Docker build context')
     p.add_argument('container_name', help='container name or ID (required)')
     p.add_argument('command', nargs=REMAINDER, default=['abc', 'def'],
-        help='command to run in container (default: bash -l)')
+        help='command to run in container (default: $shell -l)')
     global ARGS; ARGS = p.parse_args()
 
     #   `default=` does not work with nargs=REMAINDER
-    if not ARGS.command: ARGS.command = ['bash', '-l']
+    if not ARGS.command: ARGS.command = [ARGS.shell, '-l']
 
     if ARGS.image and ARGS.tag:
         die('Use only one of -t and -i')

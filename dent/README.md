@@ -195,6 +195,8 @@ No container command is run if any of the following options are given:
 The following options control the behaviour of `dent`:
 * `-q, --quiet`: Use `docker build --quiet` when building an image.
   (This may later make other things quieter as well.)
+* `-s SHELL, --shell SHELL`: Specify a shell other than `bash`
+  to run in the container if an explicit command is not given.
 
 The following options control which image is used and building of the
 image:

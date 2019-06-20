@@ -18,7 +18,10 @@ To-do Lists
 - Make this work on Windows.
 - Named command groups to run in container (e.g., to do dot-home setup).
   From a user config file?
-- Work when image shell isn't `/bin/bash`.
+- When the image shell isn't `bash` it can be specified with the `--shell`
+  option, but it would be nice to have a way for `dent` to remember the
+  shell to use with a particular container. Perhaps Docker offers some
+  per-image key-value storage we could use for this.
 - Would be nice to have image build logs stored somewhere rather than just
   spewed to stdtout.
 - Consider support for a container naming convention to help prevent
@@ -37,6 +40,10 @@ To-do Lists
 - Consider not updating all packages to latest versions. It takes a
   long time, goes stale anyway, and can easily be done by the user in
   the container itself.
+- The --shell option doesn't change the shell used to build containers.
+  Not sure if it really should or not, given that the container build
+  is still heavily distribution-dependent anyway, and the setup script
+  uses bashisms.
 
 ### User Setup and Multiuser
 
