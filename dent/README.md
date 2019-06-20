@@ -251,9 +251,21 @@ The tests consist of two parts:
    arguments after the options. The build tests may be skipped
    entirely with the `--skip-build` option.
 
-The images created by the build tests will be removed unless the
-`--keep-images` option is specified. (The test containers are always
-removed.)
+`Test` options related to images are:
+- `--no-force-rebuild`: Do not force a rebuild of layers that are
+  already cached. This means the code to build those layers isn't
+  tested, but speeds tests of other code (especially that which builds
+  subsequent layers).
+- `--keep-images`: Do not remove the images created by the build
+  tests. (The test containers are always removed.)
+
+When changing things related to the image build, use of the above two
+options and careful management of cached layers can greatly speed
+testing. In particular, changes to the container can be iteratively
+tested and debugged by making them a separate layer at the end and
+then after testing moved into an earlier layer. When doing this,
+ensure you remove or invalidate the cached final layer (by changing
+the Dockerfile line or a file it references).
 
 ### Test System Bugs
 

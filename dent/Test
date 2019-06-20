@@ -119,7 +119,7 @@ build_tests() {
         echo -n "docker rmi -f $image: "
         $docker image rm -f "$image" || true
 
-        ./dent --force-rebuild -B $baseimage -t $tag $container true \
+        ./dent $force_rebuild -B $baseimage -t $tag $container true \
             || adderror $baseimage
 
         echo -n "docker rm $container: "
@@ -152,6 +152,7 @@ usage() {
             --skip-nonbuild
             --skip-build
             --keep-images
+            --no-force-rebuild
 ____
     exit 2
 }
@@ -166,11 +167,13 @@ cd $base
 nonbuild_tests=nonbuild_tests
 build_tests=build_tests
 keep_images=false
+force_rebuild=--force-rebuild
 while true; do case "$1" in
     -h|--help)          usage;;
     --skip-nonbuild)    shift; nonbuild_tests=skip;;
     --skip-build)       shift; build_tests=skip;;
     --keep-images)      shift; keep_images=true;;
+    --no-force-rebuild) shift; force_rebuild=;;
     -*)                 usage "Unknown option '$1'";;
     *)                  break;;
 esac; done
