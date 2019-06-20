@@ -376,7 +376,7 @@ def main():
         help='base image from which to build container image')
     p.add_argument('-i', '--image',
         help='image to use for creating a new container (created if necessary)')
-    p.add_argument('-l', '--list-base-images', action='store_true',
+    p.add_argument('-L', '--list-base-images', action='store_true',
         help='list base images this script knows how to configure.'
              ' (container name must be supplied but is ignored.)')
     p.add_argument('-q', '--quiet', action='store_true')

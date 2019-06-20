@@ -98,7 +98,7 @@ build_tests() {
     fi
 
     declare -a baseimages=("$@")
-    [[ ${#baseimages} = 0 ]] && baseimages=($(./dent -l -))
+    [[ ${#baseimages} = 0 ]] && baseimages=($(./dent -L -))
     for baseimage in "${baseimages[@]}"; do
         for skip in "${skip_images[@]}"; do
             [[ $baseimage = $skip ]] && {

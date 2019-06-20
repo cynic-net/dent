@@ -188,7 +188,7 @@ Notes on `docker exec` options:
 No container command is run if any of the following options are given:
 * `-h`, `--help`: Ignore all other arguments and print a usage
   summary.
-* `-l`, `--list-base-images`: List base images `dent` knows it can use
+* `-L`, `--list-base-images`: List base images `dent` knows it can use
   to create working interactive images. For somewhat silly reasons,
   this still requires a _CNAME_ argument, which is ignored.
 
