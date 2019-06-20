@@ -119,8 +119,6 @@ build_tests() {
         echo -n "docker rmi -f $image: "
         $docker image rm -f "$image" || true
 
-        #   This won't actually do a from-scratch rebuild if image has another
-        #   tag as well; the "cached" copy will be used.
         ./dent --force-rebuild -B $baseimage -t $tag $container true \
             || adderror $baseimage
 
