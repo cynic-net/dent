@@ -167,9 +167,11 @@ name collisions. `dent` currently provides no support for this; it
 uses the container name exactly as specified.
 
 The default _COMMAND_ is `bash -l` to give an interactive login shell.
-Curently _COMMAND_ is always run directly, without a login
-environment. To run a single command in your login environment (e.g.,
-to use a shell alias) use `bash -lc 'cmd arg ...'`.
+If you give your own command, it will have the arguments joined with
+spaces and be passed to `bash -lc` to be interpreted in a login
+environment inside the container. This can be disabled with the
+`-n`/`--no-login` option, which will execute the command directly as
+given.
 
 The user and initial working directory within the container will be
 the same as specified by the `docker run` command; this is specified
@@ -195,8 +197,11 @@ No container command is run if any of the following options are given:
 The following options control the behaviour of `dent`:
 * `-q, --quiet`: Use `docker build --quiet` when building an image.
   (This may later make other things quieter as well.)
-* `-s SHELL, --shell SHELL`: Specify a shell other than `bash`
-  to run in the container if an explicit command is not given.
+* `-s SHELL, --shell SHELL`: Specify a shell (default: `bash`) to run
+  in the container if an explicit command is not given.
+* `-n, --no-login`: If a _COMMAND_ is supplied, pass it directly to
+  `exec()` rather than interpreting it in a shell. Otherwise run
+  _SHELL_ without `-l`.
 
 The following options control which image is used and building of the
 image:

@@ -3,8 +3,6 @@ To-do Lists
 
 ### General
 
-- CMD is run in login env unless raw option given. (Concatenate
-  command/args and pass to `bash -lc`.)
 - Add support for `docker exec` options `-u`, `-w`, `-e`, and maybe
   `--no-tty` and/or `-d`.
 - Create image from container.
