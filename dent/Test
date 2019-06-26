@@ -42,13 +42,13 @@ nonbuild_tests() {
     $docker run --rm --detach --name $etest_container $etest_image
 
     echo '===== Exec in running container (stdin is terminal if Test is)'
-    output=$(./dent -q $etest_container /bin/echo -n etest 0100 </dev/tty) \
+    output=$($dent -q $etest_container /bin/echo -n etest 0100 </dev/tty) \
         || die "exitcode=$? output='$output'"
     [[ $output = 'etest 0100' ]] || die "bad output='$output'"
     echo "ok output='$output'"
 
     echo '===== Exec in running container (stdin not terminal)'
-    output=$(./dent -q $etest_container /bin/echo -n etest 0110 </dev/null) \
+    output=$($dent -q $etest_container /bin/echo -n etest 0110 </dev/null) \
         || die "exitcode=$? output='$output'"
     [[ $output = 'etest 0110' ]] || die "bad output='$output'"
     echo "ok output='$output'"
@@ -58,7 +58,7 @@ nonbuild_tests() {
     $docker stop -t 0 $etest_container  # Removes itself when stopped
     echo -n "docker create $etest_container: "
     $docker create --rm --name $etest_container $etest_image
-    output=$(./dent $etest_container /bin/echo -n etest 0120) \
+    output=$($dent $etest_container /bin/echo -n etest 0120) \
         || die "exitcode=$? output='$output'"
     [[ $output = 'etest 0120' ]] || die "bad output='$output'"
     echo "ok output='$output'"
@@ -72,7 +72,7 @@ nonbuild_tests() {
     echo "docker rm -f $etest_container"
     $docker rm -f $etest_container >/dev/null
     exitcode=0; output=$(
-        ./dent -q -i alpine:latest $etest_container /bin/echo -n etest 0200
+        $dent -q -i alpine:latest $etest_container /bin/echo -n etest 0200
         ) || exitcode=$?
 
     echo '≡≡≡≡≡ Cleanup'
@@ -98,7 +98,7 @@ build_tests() {
     fi
 
     declare -a baseimages=("$@")
-    [[ ${#baseimages} = 0 ]] && baseimages=($(./dent -L -))
+    [[ ${#baseimages} = 0 ]] && baseimages=($($dent -L -))
     for baseimage in "${baseimages[@]}"; do
         for skip in "${skip_images[@]}"; do
             [[ $baseimage = $skip ]] && {
@@ -119,7 +119,7 @@ build_tests() {
         echo -n "docker rmi -f $image: "
         $docker image rm -f "$image" || true
 
-        ./dent $force_rebuild -B $baseimage -t $tag $container true \
+        $dent $force_rebuild -B $baseimage -t $tag $container true \
             || adderror $baseimage
 
         echo -n "docker rm $container: "
@@ -177,6 +177,9 @@ while true; do case "$1" in
     -*)                 usage "Unknown option '$1'";;
     *)                  break;;
 esac; done
+
+dent=./dent
+py --version >/dev/null 2>&1 && dent='py ./dent'    # Windows
 
 setup_docker
 $nonbuild_tests
