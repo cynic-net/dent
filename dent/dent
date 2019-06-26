@@ -9,6 +9,7 @@
 import  json, os, shutil, stat, string, time
 from    argparse import ArgumentParser, REMAINDER, RawDescriptionHelpFormatter
 from    collections import OrderedDict
+from    functools import lru_cache
 from    os.path import basename, join as pjoin
 from    pwd import getpwuid
 from    sys import stdin, stderr
@@ -19,7 +20,6 @@ from    textwrap import dedent
 from    subprocess import call, check_output, DEVNULL, PIPE, CalledProcessError
 
 PROGNAME    = basename(__file__)
-PWENT       = getpwuid(os.getuid())
 ARGS        = None
 
 #   To maximize build speed via use of cache when rebuilding, we want
@@ -147,6 +147,10 @@ def die(msg):
     print(PROGNAME + ':', msg, file=stderr)
     exit(1)
 
+@lru_cache()
+def pwent():
+    return getpwuid(os.getuid())
+
 ####################################################################
 #   Docker "API"
 
@@ -222,9 +226,9 @@ def build_image():
         delimiter = '%'
 
     scargs = {
-        'uid': PWENT.pw_uid,
-        'uname': PWENT.pw_name,
-        'ugecos': PWENT.pw_gecos,
+        'uid': pwent().pw_uid,
+        'uname': pwent().pw_name,
+        'ugecos': pwent().pw_gecos,
     }
     with open(pjoin(tmpdir, 'setup-image'), 'w') as f:
         os.fchmod(f.fileno(), perm_rx)
@@ -232,7 +236,7 @@ def build_image():
 
     dfargs = {
         'base_image': ARGS.base_image,
-        'uname': PWENT.pw_name,
+        'uname': pwent().pw_name,
     }
     with open(pjoin(tmpdir, 'Dockerfile'), 'w') as f:
         os.fchmod(f.fileno(), perm_r)
@@ -268,7 +272,7 @@ def image_alias():
             #   we can't generate it from the base image name.
             die('Needed a base image but none specified')
         if not ARGS.tag:
-            ARGS.tag = PWENT.pw_name
+            ARGS.tag = pwent().pw_name
         return '{}/{}:{}'.format(
             PROGNAME, ARGS.base_image.replace(':', '.'), ARGS.tag)
 
