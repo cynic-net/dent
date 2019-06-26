@@ -8,10 +8,10 @@
 
 import  json, os, shutil, stat, string, time
 from    argparse import ArgumentParser, REMAINDER, RawDescriptionHelpFormatter
-from    collections import OrderedDict
+from    collections import OrderedDict, namedtuple as ntup
 from    functools import lru_cache
+from    getpass import getuser
 from    os.path import basename, join as pjoin
-from    pwd import getpwuid
 from    sys import stdin, stderr
 from    tempfile import mkdtemp
 from    textwrap import dedent
@@ -149,7 +149,26 @@ def die(msg):
 
 @lru_cache()
 def pwent():
-    return getpwuid(os.getuid())
+    ''' Returns a pwent or, on Windows, pwent-like object with some fields
+        missing or just made up.
+
+        This returns only the ``pw_name, pw_uid, pw_gecos`` fields.
+    '''
+    ent = ntup('pwent',
+        'pw_name pw_passwd pw_uid pw_gid pw_gecos pw_dir pw_shell')
+    if hasattr(os, 'getuid'):
+        #   Actually, we should probably get the user name with getuser()
+        #   here as well, but that's extra work.
+        from pwd import getpwuid
+        return getpwuid(os.getuid())
+    else:
+        name = getuser()
+        uid = 1234              # Does windows have a better ID we could use?
+        gecos = 'Windows User'  # Should do registry lookup or whatever.
+        return ent(name, None, uid, uid, gecos, None, None)
+
+####################################################################
+#   Docker "API"
 
 ####################################################################
 #   Docker "API"
