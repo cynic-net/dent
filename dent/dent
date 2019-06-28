@@ -249,16 +249,17 @@ def build_image():
         'uname': pwent().pw_name,
         'ugecos': pwent().pw_gecos,
     }
-    with open(pjoin(tmpdir, 'setup-image'), 'w') as f:
-        os.fchmod(f.fileno(), perm_rx)
+    with open(pjoin(tmpdir, 'setup-image'), 'wt',
+            encoding='utf-8', newline='\n') as f:
+        if hasattr(os, 'fchmod'): os.fchmod(f.fileno(), perm_rx)
         print(PTemplate(SETUP_IMAGE).substitute(scargs), file=f)
 
     dfargs = {
         'base_image': ARGS.base_image,
         'uname': pwent().pw_name,
     }
-    with open(pjoin(tmpdir, 'Dockerfile'), 'w') as f:
-        os.fchmod(f.fileno(), perm_r)
+    with open(pjoin(tmpdir, 'Dockerfile'), 'wt', encoding='utf-8') as f:
+        if hasattr(os, 'fchmod'): os.fchmod(f.fileno(), perm_r)
         print(PTemplate(DOCKERFILE).substitute(dfargs), file=f)
 
     if ARGS.force_rebuild:
