@@ -226,7 +226,7 @@ def build_image():
         'uname': PWENT.pw_name,
         'ugecos': PWENT.pw_gecos,
     }
-    with open(pjoin(tmpdir, 'setup-image'), 'w') as f:
+    with open(pjoin(tmpdir, 'setup-image'), 'w', encoding='UTF-8') as f:
         os.fchmod(f.fileno(), perm_rx)
         print(PTemplate(SETUP_IMAGE).substitute(scargs), file=f)
 
@@ -234,7 +234,7 @@ def build_image():
         'base_image': ARGS.base_image,
         'uname': PWENT.pw_name,
     }
-    with open(pjoin(tmpdir, 'Dockerfile'), 'w') as f:
+    with open(pjoin(tmpdir, 'Dockerfile'), 'w', encoding='UTF-8') as f:
         os.fchmod(f.fileno(), perm_r)
         print(PTemplate(DOCKERFILE).substitute(dfargs), file=f)
 
