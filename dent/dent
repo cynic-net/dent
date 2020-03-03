@@ -88,12 +88,16 @@ packages_apt() {
     echo '-- Package updates/installs'
     export DEBIAN_FRONTEND=noninteractive
     apt-get update
-    #apt-get -y dist-upgrade
     #   Install etckeeper first so we have a record of the following installs.
     apt-get -y install git etckeeper
     #   ≤14.04 always configures bzr, even if git is installed instead
     sed -i -e '/^VCS=/s/.*/VCS="git"/' /etc/etckeeper/etckeeper.conf
     etckeeper init
+    #   It's not worth the time to run dist-upgrade now so as to have
+    #   the latest packages in the image because the image will be out
+    #   of date in a week or two anyway and the user will still have
+    #   to run dist-upgrade himself on new containers.
+    #apt-get -y dist-upgrade
     #   We install a minimal set of packages here because
     #   the user will use `distro` to install what he needs.
     apt-get -y install $UNIVERSAL_PKGS locales manpages
