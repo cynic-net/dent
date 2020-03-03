@@ -66,10 +66,6 @@ packages() {
     export LC_ALL=C
     if type apt 2>/dev/null; then
         packages_apt
-        #   XXX These don't seem to fix the subsequent "Your name and email
-        #   address were configured automatically" message.
-        git config --global user.name 'dent root user'
-        git config --global user.email 'root@dent.nonexistent'
         ( cd /etc \
             && sed -i -e '/en_US/s/^# //' -e '/ja_JP/s/^# //' /etc/locale.gen \
             && etckeeper commit -m 'Enable UTF-8 and other locales' \
@@ -88,8 +84,14 @@ packages_apt() {
     echo '-- Package updates/installs'
     export DEBIAN_FRONTEND=noninteractive
     apt-get update
-    #   Install etckeeper first so we have a record of the following installs.
-    apt-get -y install git etckeeper
+    #   We must install git and set user.name/email before installing
+    #   etckeeper or etckeeper will be unable to commit.
+    apt-get -y install git
+    git config --global user.name 'dent root user'
+    git config --global user.email 'root@dent.nonexistent'
+    #   Install etckeeper as early as posible so we have a record of
+    #   the following installs.
+    apt-get -y install etckeeper
     #   ≤14.04 always configures bzr, even if git is installed instead
     sed -i -e '/^VCS=/s/.*/VCS="git"/' /etc/etckeeper/etckeeper.conf
     etckeeper init
