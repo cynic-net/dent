@@ -185,7 +185,8 @@ Notes on `docker exec` options:
 
 #### Options
 
-No container command is run if any of the following options are given:
+No container command is run if either of the following two options are
+given:
 * `-h`, `--help`: Ignore all other arguments and print a usage
   summary.
 * `-L`, `--list-base-images`: List base images `dent` knows it can use
