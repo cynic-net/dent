@@ -1,7 +1,7 @@
 [ -n "$BASH_SOURCE" ] \
     || { echo 1>&2 "source (.) this with Bash."; exit 2; }
 __activate_quiet=
-[[ $1 = -q ]] && { shift; __activate_quiet=-q; }
+[[ ${1-} = -q ]] && { shift; __activate_quiet=-q; }
 (
     basedir=$(cd "$(dirname "$BASH_SOURCE")" && pwd -P)
     cd "$basedir"
@@ -16,9 +16,12 @@ __activate_quiet=
             -b "$bsdir/build" -t "$bsdir/target" virtualenv
 
         echo 'Building virtualenv...'
-        $py $bsdir/target/virtualenv.py --prompt="($(basename "$basedir")) " \
+        PYTHONPATH="$bsdir/target" $py -s -m virtualenv \
+            --prompt="($(basename "$basedir")) " \
             $__activate_quiet .build/virtualenv "$@" \
-        && . .build/virtualenv/*/activate
+        && . .build/virtualenv/*/activate \
+        && pip install $__activate_quiet -r requirements.txt
     }
 ) \
-&& . "$(dirname "$BASH_SOURCE")"/.build/virtualenv/*/activate
+&& . "$(dirname "$BASH_SOURCE")"/.build/virtualenv/*/activate \
+&& export PYTHONPATH="$(dirname "$BASH_SOURCE")/lib"
