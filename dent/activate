@@ -19,8 +19,7 @@ __activate_quiet=
         PYTHONPATH="$bsdir/target" $py -s -m virtualenv \
             --prompt="($(basename "$basedir")) " \
             $__activate_quiet .build/virtualenv "$@" \
-        && . .build/virtualenv/*/activate \
-        && pip install $__activate_quiet -r requirements.txt
+        && . .build/virtualenv/*/activate
     }
 ) \
 && . "$(dirname "$BASH_SOURCE")"/.build/virtualenv/*/activate \
