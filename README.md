@@ -18,7 +18,21 @@ Tools
   non-root logins used for testing, sandboxed terminal sharing, etc.
 
 
+Similar Projects
+----------------
+
+The [modularitycontainers] team (perhaps from Red Hat) has repos for
+various system tools (e.g., dhcp-client) and applications (e.g., Dovecot,
+Postfix) in the [container-images] organization on GitHub. However,
+none have been updated in more than two years, and all the repos were
+marked as "archived" in 2018.
+
+
 
 <!-------------------------------------------------------------------->
 [`dent/`]: dent/
 [`dot-home`]: https://github.com/dot-home/_dot-home
+
+<!-- Similar Projects -->
+[container-images]: https://github.com/container-images/dovecot
+[modularitycontainers]: https://hub.docker.com/u/modularitycontainers/
