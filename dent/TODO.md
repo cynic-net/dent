@@ -32,7 +32,7 @@ To-do Lists
   installed and updated packages for two different users building the
   same distribution.
 - Generic "install individual package" function that knows to use apt
-  or yum.
+  or yum. Or look into using github.com/devexp-db/distgen for this.
 - Do `git config --email` etc. before installing etckeeper.
 - Consider not updating all packages to latest versions. It takes a
   long time, goes stale anyway, and can easily be done by the user in
