@@ -3,13 +3,14 @@ To-do Lists
 
 ### General
 
-- CMD is run in login env unless raw option given. (Concatenate
-  command/args and pass to `bash -lc`.)
+- Add `--verbose` and `--dry-run` to see what it's doing and/or should be doing.
 - Add support for `docker exec` options `-u`, `-w`, `-e`, and maybe
   `--no-tty` and/or `-d`.
 - Create image from container.
-- Special tmate support because tmate needs a private key.
 - Support for detach and setting user, CWD, env vars with `docker exec`.
+- Add option to add arbitrary `docker run` arguments when doing container
+  creation so that one can add bind mounts, etc. (perhaps this is just a
+  hack for more extensive support of this in the next item).
 - Further Docker config for container, e.g., bind mounts:
   - Configuration file created on the fly? Or just command-line args?
   - Trying to change config for existing container is an error, of course.
@@ -25,6 +26,12 @@ To-do Lists
   collisions on multiuser systems. E.g., `dent foo` might first look for
   `cjs-foo`, then `foo`, then fall back to creating `cjs-foo`.
 
+### In-container Operation
+
+- CMD is run in login env unless raw option given. (Concatenate
+  command/args and pass to `bash -lc`.)
+- Special tmate support because tmate needs a private key.
+
 ### Setup Script
 
 - Split the setup script into two layers: package updates and
@@ -38,7 +45,7 @@ To-do Lists
   long time, goes stale anyway, and can easily be done by the user in
   the container itself.
 
-### User Setup and Multiuser
+### In-container User Setup and Multiuser
 
 - Build image with all non-system users rather than just current one?
 - Split package setup/user setup into separate layers to gain more caching?
