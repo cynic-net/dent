@@ -162,7 +162,7 @@ ____
 
 base=$(cd "$(dirname "$0")" && pwd -P)
 cd $base
-. ./activate -q
+. ./activate -q  # -p $(pythonz locate 3.5.10)
 
 nonbuild_tests=nonbuild_tests
 build_tests=build_tests
