@@ -58,7 +58,7 @@ nonbuild_tests() {
     $docker stop -t 0 $etest_container  # Removes itself when stopped
     echo -n "docker create $etest_container: "
     $docker create --rm --name $etest_container $etest_image
-    output=$(./dent $etest_container /bin/echo -n etest 0120) \
+    output=$(./dent -q $etest_container /bin/echo -n etest 0120) \
         || die "exitcode=$? output='$output'"
     [[ $output = 'etest 0120' ]] || die "bad output='$output'"
     echo "ok output='$output'"

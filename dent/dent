@@ -11,7 +11,7 @@ from    argparse import ArgumentParser, REMAINDER, RawDescriptionHelpFormatter
 from    collections import OrderedDict
 from    os.path import basename, join as pjoin
 from    pwd import getpwuid
-from    sys import stdin, stderr
+from    sys import stdin, stdout, stderr
 from    tempfile import mkdtemp
 from    textwrap import dedent
 
@@ -371,6 +371,8 @@ def enter_container():
         command.append('-t')
     command.append(ARGS.container_name)
     command += ARGS.command
+    stdout.flush(); stderr.flush()  # Ensure all our output is complete
+                                    # before this process is replaced.
     os.execvp(command[0], command)
     #   Never returns
 
