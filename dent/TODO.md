@@ -3,7 +3,7 @@ To-do Lists
 
 ### General
 
-- Add `--verbose` and `--dry-run` to see what it's doing and/or should be doing.
+- Add `-v/--verbose` option see what it's doing?
 - Add support for `docker exec` options `-u`, `-w`, `-e`, and maybe
   `--no-tty` and/or `-d`.
 - Create image from container.

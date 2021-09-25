@@ -197,6 +197,14 @@ The following options control the behaviour of `dent`:
 * `-q, --quiet`: Do not print informational lines indicating what Docker
   image and container actions (remove/build/create) are being taken and use
   `docker build --quiet` when building an image.
+* `-n, --dry-run`: For commands that would change or execute Docker images
+  or containers (including `rmi`, `build`, `run` and `exec`), just print
+  the command to stderr. (Unless you use `-q`, the usual user-oriented
+  messages about actions to be taken will still appear on stdout.) Build
+  configuration is still created, so `--keep-tmpdir` still works. As well
+  as testing, this can also be useful to customize image and container
+  creation by printing the command that would be executed and then
+  executing it by hand with different options.
 
 The following options control which image is used and building of the
 image:

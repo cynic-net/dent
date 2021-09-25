@@ -165,6 +165,26 @@ def die(msg):
     print(PROGNAME + ':', msg, file=stderr)
     exit(1)
 
+def drcall(command, **kwargs):
+    ''' Execute the `command` with `**kwargs` just as `subprocess.call()`
+        would unless we're doing a dry run, in which case just print
+        `command` to `stderr` and return success.
+
+        This uses stderr rather than stdout becuase user messages are
+        already going to `stdout` and so this allows more easily separating
+        the commands. (When all is well, nothing other than the commands
+        should appear on stderr.)
+    '''
+    if not ARGS.dry_run:
+        return call(command, **kwargs)
+    else:
+        #   Ensure we're not coming out before stuff that's been buffered
+        #   but not yet printed (many systems buffer stdout but not stderr).
+        stdout.flush()
+        print(' '.join(command), file=stderr)
+        stderr.flush()
+        return 0
+
 ####################################################################
 #   Docker "API"
 
@@ -198,6 +218,11 @@ def docker_inspect(thing, *container_names):
         any return code (letting the error of the list being empty
         appear later) and let stderr pass through to the user to help
         debug any problems.
+
+        This is not affected by ``--dry-run`` because this only queries
+        existing configuration and state, and in many cases result of those
+        queries determines what state-changing Docker commands will or
+        would be executed.
     '''
     try:
         command = DOCKER_COMMAND + (thing, 'inspect') + container_names
@@ -217,7 +242,7 @@ def docker_container_start(*container_names):
     command = DOCKER_COMMAND + ('container', 'start') + container_names
     #   Suppress stdout because `docker` prints the names
     #   of the containers it started.
-    retcode = call(command, stdout=DEVNULL)
+    retcode = drcall(command, stdout=DEVNULL)
     if retcode != 0:
         die("Couldn't start container")
     return None
@@ -258,8 +283,9 @@ def build_image():
         print(PTemplate(DOCKERFILE).substitute(dfargs), file=f)
 
     if ARGS.force_rebuild:
-        qprint('Untagging {} and forcing full rebuild'.format(image_alias()))
-        call(DOCKER_COMMAND + ('rmi', '-f', image_alias()))
+        qprint("Removing image '{}' and forcing full rebuild" \
+            .format(image_alias()))
+        drcall(DOCKER_COMMAND + ('rmi', '-f', image_alias()))
 
     qprint("Building image '{}'".format(image_alias()))
     command = DOCKER_COMMAND + ('build',)
@@ -268,7 +294,7 @@ def build_image():
     if ARGS.force_rebuild:
         command += ('--no-cache',)
     command += ('--tag', image_alias(), tmpdir)
-    retcode = call(command)
+    retcode = drcall(command)
     if retcode != 0:
         die("Error building image '{}' from '{}'"
             .format(image_alias(), ARGS.base_image))
@@ -325,7 +351,7 @@ def create_container():
         '--name='+ARGS.container_name, '--hostname='+ARGS.container_name,
         '--rm=false', '--detach=true', '--tty=false',
         image_alias(), '/bin/sleep', str(2**31-1) )
-    retcode = call(command, stdout=DEVNULL)     # stdout prints container ID
+    retcode = drcall(command, stdout=DEVNULL)   # stdout prints container ID
     if retcode != 0:
         die('Failed to create container {} with command:\n{}' \
             .format(ARGS.container_name, ' '.join(command)))
@@ -339,6 +365,7 @@ def waitforstart(container_name):
 
         .. Docker API: https://docs.docker.com/engine/api/v1.30/#operation/ContainerStart
     '''
+    if ARGS.dry_run: return
     tries = 50
     while tries > 0:
         containers = docker_inspect('container', ARGS.container_name)
@@ -379,8 +406,12 @@ def enter_container():
     command += ARGS.command
     stdout.flush(); stderr.flush()  # Ensure all our output is complete
                                     # before this process is replaced.
-    os.execvp(command[0], command)
-    #   Never returns
+    if not ARGS.dry_run:
+        os.execvp(command[0], command)
+        #   Never returns
+    else:
+        print(' '.join(command), file=stderr)
+        exit(0)
 
 ####################################################################
 #   Main
@@ -396,6 +427,8 @@ def main():
         help='when done, do not delete tmpdir containing build files')
     p.add_argument('-B', '--base-image',
         help='base image from which to build container image')
+    p.add_argument('-n', '--dry-run', action='store_true',
+        help="don't execute docker image commands, just print them on stderr")
     p.add_argument('-i', '--image',
         help='image to use for creating a new container (created if necessary)')
     p.add_argument('-L', '--list-base-images', action='store_true',
