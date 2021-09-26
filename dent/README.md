@@ -194,8 +194,9 @@ given:
   this still requires a _CNAME_ argument, which is ignored.
 
 The following options control the behaviour of `dent`:
-* `-q, --quiet`: Use `docker build --quiet` when building an image.
-  (This may later make other things quieter as well.)
+* `-q, --quiet`: Do not print informational lines indicating what Docker
+  image and container actions (remove/build/create) are being taken and use
+  `docker build --quiet` when building an image.
 
 The following options control which image is used and building of the
 image:
