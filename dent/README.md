@@ -220,7 +220,7 @@ The following options are used mainly for development and debugging:
 * `--keep-tmpdir`: If a new image is built from a base image, do not
   remove the temporary directory containing the `Dockerfile` and the
   build context. The name of the directory is printed in a message at
-  the start of the build.
+  the start of the build. (This message is not suppressed by `-q`.)
 
 
 Testing and Development

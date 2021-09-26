@@ -151,9 +151,14 @@ users
 ####################################################################
 #   Utility functions
 
-def qprint(*args, **kwargs):
-    ' print unless quiet flag is set '
-    if not ARGS.quiet:
+def qprint(*args, force_print=False, **kwargs):
+    ''' Call `print()` on arguments unless quiet flag is set.
+
+        `force_print` will print even if ARGS.quiet is set; this allows the
+        caller to test on a second condition without having to use ``if``
+        and a duplicate call to `print()`.
+    '''
+    if force_print or not ARGS.quiet:
         print('-----', *args, **kwargs)
 
 def die(msg):
@@ -229,7 +234,8 @@ def build_image():
     else:
         tmpdir = ARGS.tmpdir
         os.mkdir(tmpdir, perm_rwx)  # We want to die if it already exists
-    qprint('Setting up context for image build in {}'.format(tmpdir))
+    qprint('Setting up context for image build in {}'.format(tmpdir),
+        force_print=ARGS.keep_tmpdir)
 
     class PTemplate(string.Template):
         delimiter = '%'
