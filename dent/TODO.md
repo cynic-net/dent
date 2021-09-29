@@ -48,7 +48,6 @@ To-do Lists
 ### In-container User Setup and Multiuser
 
 - Build image with all non-system users rather than just current one?
-- Split package setup/user setup into separate layers to gain more caching?
 - While the image name collision problem between users is fixed, there is
   nothing in place to warn users using the same name for a container as
   another user. Is it worth adding something to automaticaly include the
@@ -72,3 +71,16 @@ To-do Lists
   something else we can do to help with this? Ideally, dent should be
   able to help with this in as transparent a way possible.
 
+Discarded Ideas
+---------------
+
+- One could split the generic system/package setup and user-specific setup
+  into two separate image layers so that in theory multiple users on the
+  same system could share the common image layers. In practice this almost
+  never works because users regularly want to update their generic
+  system/package layer to include the latest package updates (so generating
+  a new container with the latest package updates takes less time). Unless
+  all users do these updates in sync, they'll end up with separate generic
+  system/package layers anyway, and probably more of them because cleanup
+  of old ones may depend on multiple users all agreeing to drop their
+  dependent containers.

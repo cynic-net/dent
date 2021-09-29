@@ -48,10 +48,6 @@ USER %{uname}
 WORKDIR /home/%{uname}
 '''
 
-#   XXX This should be split into setup-base for standard packages etc.
-#   and setup-user for the user-specific stuff so that multiple users
-#   (or users with different custom setups) can re-use the cached image
-#   with the package setup that took most of the build time.
 SETUP_IMAGE = '''\
 #!/usr/bin/env bash
 set -e -o pipefail
