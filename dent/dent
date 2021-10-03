@@ -122,7 +122,11 @@ packages_rpm() {
 users() {
     echo '-- User creation'
 
-    local -a groups=() allgroups=(sudo systemd-journal)
+    #   Note we do not add the user to the `sudo` group as that will
+    #   introduce a PASSWD: entry even though it's overridden by the
+    #   NOPASSWD: below, and that PASSWD entry will make `sudo -v`
+    #   require a password.
+    local -a groups=() allgroups=(systemd-journal)
     for group in ${allgroups[@]}; do
         grep -q "^$group:" /etc/group && groups+=("$group")
     done
