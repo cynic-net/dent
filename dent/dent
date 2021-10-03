@@ -134,7 +134,7 @@ users() {
         --uid %{uid} -c '%{ugecos}' %{uname}
     #   Since we have no password, we must let the user sudo without one.
     mkdir -p /etc/sudoers.d/    # In case we skipped sudo install
-    echo '%{uname} ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/50-%{uname}
+    echo '%{uname} ALL=(ALL:ALL) NOPASSWD:ALL' > /etc/sudoers.d/50-%{uname}
 }
 
 ####################################################################
