@@ -39,7 +39,12 @@ dryrun_tests() {
         ' | tr -d '\n ' )
     [[ $output =~ $expected ]] || die "dryrun bad output='$output'"
     echo 'dryrun ok'
-   #echo "$output"; echo
+    $verbose && {
+        echo '──── Dryrun Output ────'
+        echo "$output"
+        echo '───────────────────────'
+    }
+    return 0    # Avoid error if $verbose is false.
 }
 
 nonbuild_tests() {
@@ -189,12 +194,14 @@ base=$(cd "$(dirname "$0")" && pwd -P)
 cd $base
 . ./activate -q  # -p $(pythonz locate 3.5.10)
 
+verbose=false
 nonbuild_tests=nonbuild_tests
 build_tests=build_tests
 keep_images=false
 force_rebuild=--force-rebuild
 while true; do case "$1" in
     -h|--help)          usage;;
+    -v|--verbose)       shift; verbose=true;;
     --skip-nonbuild)    shift; nonbuild_tests=skip;;
     --skip-build)       shift; build_tests=skip;;
     --keep-images)      shift; keep_images=true;;
