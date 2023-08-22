@@ -87,6 +87,10 @@ packages_apt() {
     git config --global user.email 'root@dent.nonexistent'
     #   Install etckeeper as early as posible so we have a record of
     #   the following installs.
+    cat >> /etc/.gitignore << _____ # The Docker host owns these files
+/hosts
+/resolv.conf
+_____
     apt-get -y install etckeeper
     #   ≤14.04 always configures bzr, even if git is installed instead
     sed -i -e '/^VCS=/s/.*/VCS="git"/' /etc/etckeeper/etckeeper.conf
