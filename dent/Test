@@ -140,8 +140,8 @@ build_tests() {
 
         tag=dent-test-$$
         tag=dent-test       # DEBUG
-        image="dent-${baseimage/:/-}:$tag"  # duplicates code in dent
-        container="${image/:/-}"
+        image="dent/${baseimage/:/.}:$tag"  # duplicates code in dent
+        container="dent-test-${baseimage/:/.}"
         echo "===== $baseimage"
         echo "    Image: $image"
         echo "Container: $container"
