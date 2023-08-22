@@ -4,13 +4,9 @@ To-do Lists
 ### General
 
 - Add `-v/--verbose` option see what it's doing?
-- Add support for `docker exec` options `-u`, `-w`, `-e`, and maybe
-  `--no-tty` and/or `-d`.
+- Add support for `docker exec` options `-u` (setting user), `-w` (setting
+  CWD), `-e` (env vars), and maybe `--no-tty` and/or `-d` (detached).
 - Create image from container.
-- Support for detach and setting user, CWD, env vars with `docker exec`.
-- Add option to add arbitrary `docker run` arguments when doing container
-  creation so that one can add bind mounts, etc. (perhaps this is just a
-  hack for more extensive support of this in the next item).
 - Further Docker config for container, e.g., bind mounts:
   - Configuration file created on the fly? Or just command-line args?
   - Trying to change config for existing container is an error, of course.
@@ -32,7 +28,7 @@ To-do Lists
   command/args and pass to `bash -lc`.)
 - Special tmate support because tmate needs a private key.
 
-### Setup Script
+### Container Setup Script
 
 - Split the setup script into two layers: package updates and
   user-specific stuff so that we can get layer sharing for the
@@ -50,7 +46,7 @@ To-do Lists
 - Build image with all non-system users rather than just current one?
 - While the image name collision problem between users is fixed, there is
   nothing in place to warn users using the same name for a container as
-  another user. Is it worth adding something to automaticaly include the
+  another user. Is it worth adding something to automatically include the
   user name in the container name?
 
 ### Daemonized Processes in Container
