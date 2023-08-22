@@ -325,18 +325,27 @@ def image_alias():
             PROGNAME, ARGS.base_image.replace(':', '.'), ARGS.tag)
 
 #   These are the images we know we can build, because we've tested them.
+#   Commented out entries we either used to be able to build but no longer
+#   can (usually because they are old and the package servers are no longer
+#   available) or have a comment explaining that we need to fix something.
 BASE_IMAGES = OrderedDict((
-    ('debian:8', {}),
-    ('debian:9', {}),
+#   ('debian:8',        {}),
+#   ('debian:9',        {}),
     ('debian:10', {}),
     ('debian:11', {}),
+    ('debian:12',       {}),
 #   ('ubuntu:14.04', {}),
     ('ubuntu:16.04', {}),
     ('ubuntu:18.04', {}),
     ('ubuntu:20.04', {}),
-    ('centos:6', {}),
+    ('ubuntu:22.04', {}),
+    ('centos:6',        {}),    # But not with kernel ≥ 4.19 (works on 4.4).
     ('centos:7', {}),
+#   ('centos:8',        {}),    # FIXME
+    ('rockylinux:8',    {}),
+#   ('rockylinux:9',    {}),    # FIXME: --allowerasing?
     ('fedora:30', {}),
+    ('fedora:38',       {}),
 ))
 
 def create_container():
