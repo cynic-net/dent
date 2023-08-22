@@ -439,8 +439,8 @@ def main():
     p = ArgumentParser(formatter_class=RawDescriptionHelpFormatter,
         description=dedent('''
             Start a new process in a Docker container, creating the container
-            and even image if necessary. For detailed documentation, see:
-                https://github.com/0cjs/contapps/
+            and image if necessary. For detailed documentation, see:
+                https://github.com/cynic-net/dent
         '''))
     p.add_argument('--keep-tmpdir', action='store_true',
         help='when done, do not delete tmpdir containing build files')
