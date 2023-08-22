@@ -343,7 +343,8 @@ BASE_IMAGES = OrderedDict((
     ('centos:7',        {}),
 #   ('centos:8',        {}),    # FIXME
     ('rockylinux:8',    {}),
-#   ('rockylinux:9',    {}),    # FIXME: --allowerasing?
+#   ('rockylinux:9',    {}),    # FIXME: --allowerasing would do the trick,
+                                # but that's not in CentOS 7.
     ('fedora:30',       {}),
     ('fedora:38',       {}),
 ))
