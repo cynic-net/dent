@@ -56,6 +56,15 @@ Python][py-docker] only to write significantly more code didn't seem
 worthwhile.
 
 
+Installation
+------------
+
+`dent` is a stand-alone Python script. You'll need to have `python3`
+available in your path; there are no other dependencies other than the
+Python standard library. You can simply copy the script wherever you like,
+or create a symlink in your path pointing to `dent` in any location.
+
+
 Operation Overview
 ------------------
 
