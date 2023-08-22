@@ -331,20 +331,20 @@ def image_alias():
 BASE_IMAGES = OrderedDict((
 #   ('debian:8',        {}),
 #   ('debian:9',        {}),
-    ('debian:10', {}),
-    ('debian:11', {}),
+    ('debian:10',       {}),
+    ('debian:11',       {}),
     ('debian:12',       {}),
-#   ('ubuntu:14.04', {}),
-    ('ubuntu:16.04', {}),
-    ('ubuntu:18.04', {}),
-    ('ubuntu:20.04', {}),
-    ('ubuntu:22.04', {}),
+#   ('ubuntu:14.04',    {}),
+    ('ubuntu:16.04',    {}),
+    ('ubuntu:18.04',    {}),
+    ('ubuntu:20.04',    {}),
+    ('ubuntu:22.04',    {}),
     ('centos:6',        {}),    # But not with kernel ≥ 4.19 (works on 4.4).
-    ('centos:7', {}),
+    ('centos:7',        {}),
 #   ('centos:8',        {}),    # FIXME
     ('rockylinux:8',    {}),
 #   ('rockylinux:9',    {}),    # FIXME: --allowerasing?
-    ('fedora:30', {}),
+    ('fedora:30',       {}),
     ('fedora:38',       {}),
 ))
 
