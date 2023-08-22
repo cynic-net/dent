@@ -245,7 +245,7 @@ def docker_inspect(thing, *container_names):
 def docker_container_start(*container_names):
     ''' Run `docker container start` on the arguments.
     '''
-    qprint("Starting container '{}'".format(ARGS.container_name))
+    qprint("Starting container '{}'".format(ARGS.CONTANER_NAME))
     command = DOCKER_COMMAND + ('container', 'start') + container_names
     #   Suppress stdout because `docker` prints the names
     #   of the containers it started.
@@ -365,15 +365,15 @@ def create_container():
     else:
         build_image()
     qprint("Creating new container '{}' from image '{}'" \
-        .format(ARGS.container_name, image_alias()))
+        .format(ARGS.CONTANER_NAME, image_alias()))
     command = DOCKER_COMMAND + ('run',
-        '--name='+ARGS.container_name, '--hostname='+ARGS.container_name,
+        '--name='+ARGS.CONTANER_NAME, '--hostname='+ARGS.CONTANER_NAME,
         '--rm=false', '--detach=true', '--tty=false',
         image_alias(), '/bin/sleep', str(2**31-1) )
     retcode = drcall(command, stdout=DEVNULL)   # stdout prints container ID
     if retcode != 0:
         die('Failed to create container {} with command:\n{}' \
-            .format(ARGS.container_name, ' '.join(command)))
+            .format(ARGS.CONTANER_NAME, ' '.join(command)))
 
 def waitforstart(container_name):
     ''' Wait for a container to start, dieing if it exits immediately.
@@ -387,29 +387,29 @@ def waitforstart(container_name):
     if ARGS.dry_run: return
     tries = 50
     while tries > 0:
-        containers = docker_inspect('container', ARGS.container_name)
+        containers = docker_inspect('container', ARGS.CONTANER_NAME)
         if not containers:
             die("Container '{}' was started but is no longer running" \
-                .format(ARGS.container_name))
+                .format(ARGS.CONTANER_NAME))
         if containers[0]['State']['Running']:
             break
         else:
             time.sleep(0.1)
             tries -= 1
     if not tries > 0:
-        die("Cannot start container '{}'".format(ARGS.container_name))
+        die("Cannot start container '{}'".format(ARGS.CONTANER_NAME))
 
 def enter_container():
     ' Enter the container, doing any dependent actions necessary. '
     docker_setup()
 
-    containers = docker_inspect('container', ARGS.container_name)
+    containers = docker_inspect('container', ARGS.CONTANER_NAME)
     if not containers:
         create_container()      # Also starts
     elif not containers[0]['State']['Running']:
-        docker_container_start(ARGS.container_name)
+        docker_container_start(ARGS.CONTANER_NAME)
 
-    waitforstart(ARGS.container_name)
+    waitforstart(ARGS.CONTANER_NAME)
 
     #   Rather than using `container.exec_run() and then rewriting the same
     #   code to deal with the copying of stdin/out/err between what the
@@ -421,8 +421,8 @@ def enter_container():
     command.append('-i')
     if stdin.isatty():
         command.append('-t')
-    command.append(ARGS.container_name)
-    command += ARGS.command
+    command.append(ARGS.CONTANER_NAME)
+    command += ARGS.COMMAND
     stdout.flush(); stderr.flush()  # Ensure all our output is complete
                                     # before this process is replaced.
     if not ARGS.dry_run:
@@ -465,13 +465,13 @@ def main():
     #   We must have either a container name or one of the options that
     #   requests information.
     pe = p.add_mutually_exclusive_group(required=True)
-    pe.add_argument('container_name', nargs='?',
+    pe.add_argument('CONTANER_NAME', nargs='?',
         help='container name or ID (required)')
     pe.add_argument('-L', '--list-base-images', action='store_true',
         help='list base images this script knows how to configure')
 
     #   All remaining args are the command to run in the container.
-    p.add_argument('command', nargs=REMAINDER, default='SEE BELOW',
+    p.add_argument('COMMAND', nargs=REMAINDER, default='SEE BELOW',
         help='command to run in container (default: bash -l)')
 
     global ARGS; ARGS = p.parse_args()
@@ -479,11 +479,11 @@ def main():
     #   nargs='*' because that will cause options in the remainder to be
     #   interpreted as dent options unless the user adds `--` between,
     #   which is inconvenient.
-    if not ARGS.command: ARGS.command = ['bash', '-l']
+    if not ARGS.COMMAND: ARGS.COMMAND = ['bash', '-l']
 
     if ARGS.list_base_images:
         for i in BASE_IMAGES.keys(): print(i)
-    elif ARGS.container_name:
+    elif ARGS.CONTANER_NAME:
         return enter_container()
     else:
         die('Internal argument parsing error.')     # Should never happen.
