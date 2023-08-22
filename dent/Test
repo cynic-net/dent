@@ -66,7 +66,7 @@ nonbuild_tests() {
     echo '≡≡≡≡≡ Pre-existing container tests'
     #   The test container made from this image is run with --rm so it will
     #   automatically clean itself up shortly, regardless of test status.
-    echo -n "docker rm $etest_container: "
+    echo -n "docker container rm -f $etest_container: "
     $docker container rm -f $etest_container || true
     echo -n "docker run --name $etest_container $etest_image: "
     $docker run --rm --detach --name $etest_container $etest_image
@@ -94,19 +94,20 @@ nonbuild_tests() {
     echo "ok output='$output'"
 
     $keep_images || {
-        echo -n "docker rmi $etest_image: "
+        echo -n "docker image rm -f $etest_image: "
         $docker image rm -f "$etest_image" || true
     }
 
     echo '≡≡≡≡≡ Container creation from pre-existing image'
-    echo "docker rm -f $etest_container"
-    $docker rm -f $etest_container >/dev/null
+    echo "docker container rm -f $etest_container"
+    $docker container rm -f $etest_container >/dev/null
+    echo "./dent -q -i alpine:latest $etest_container /bin/echo -n etest 0200"
     exitcode=0; output=$(
         ./dent -q -i alpine:latest $etest_container /bin/echo -n etest 0200
         ) || exitcode=$?
 
-    echo '≡≡≡≡≡ Cleanup'
-    $docker rm -f $etest_container >/dev/null 2>&1 || true
+    echo "docker container rm -f $etest_container"
+    $docker container rm -f $etest_container >/dev/null 2>&1 || true
 
     [[ $exitcode -eq 0 ]] || die "exitcode=$? output='$output'"
     [[ $output = 'etest 0200' ]] || die "bad output='$output'"
@@ -146,16 +147,16 @@ build_tests() {
         echo "Container: $container"
 
         #   Also removes any containers based on this image, running or not.
-        echo -n "docker rmi -f $image: "
+        echo -n "docker image rm -f $image: "
         $docker image rm -f "$image" || true
 
         ./dent $force_rebuild -B $baseimage -t $tag $container true \
             || adderror $baseimage
 
-        echo -n "docker rm $container: "
+        echo -n "docker container rm -f $container: "
         $docker container rm -f "$container" || true
         $keep_images || {
-            echo -n "docker rmi $image: "
+            echo -n "docker image rm -f $image: "
             $docker image rm -f "$image" || true
         }
     done
