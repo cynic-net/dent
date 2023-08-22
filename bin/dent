@@ -6,6 +6,8 @@
     the full repo, you can find it at <https://github.com/0cjs/contapps/>.
 '''
 
+VERSION = '0.8.0'
+
 import  json, os, shutil, stat, string, time
 from    argparse import ArgumentParser, REMAINDER, RawDescriptionHelpFormatter
 from    collections import OrderedDict
@@ -469,6 +471,8 @@ def main():
         help='container name or ID (required)')
     pe.add_argument('-L', '--list-base-images', action='store_true',
         help='list base images this script knows how to configure')
+    pe.add_argument('--version', action='store_true',
+        help='show program version information')
 
     #   All remaining args are the command to run in the container.
     p.add_argument('COMMAND', nargs=REMAINDER, default='SEE BELOW',
@@ -483,6 +487,8 @@ def main():
 
     if ARGS.list_base_images:
         for i in BASE_IMAGES.keys(): print(i)
+    elif ARGS.version:
+        print('{} version {}'.format(p.prog, VERSION))
     elif ARGS.CONTANER_NAME:
         return enter_container()
     else:
