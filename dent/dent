@@ -79,7 +79,10 @@ UNIVERSAL_PKGS='sudo curl wget git vim man-db'
 packages_apt() {
     echo '-- Package updates/installs'
     export DEBIAN_FRONTEND=noninteractive
-    apt-get update
+    #   If we fail to download some updates, e.g. due to no network
+    #   connection or updates no longer being available for old systems,
+    #   we'll live with that.
+    apt-get update || true
     #   We must install git and set user.name/email before installing
     #   etckeeper or etckeeper will be unable to commit.
     apt-get -y install git
