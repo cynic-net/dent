@@ -26,7 +26,7 @@ dryrun_tests() {
     #     are properly interleaved.
     #   * As well as --dry-run, this also confirms that various parameters
     #     of the `docker` commands, particularly `docker run`, are correct.
-    output=$(2>&1 ./dent --dry-run -R -B drytest:xx $contname true) \
+    output=$(2>&1 bin/dent --dry-run -R -B drytest:xx $contname true) \
         || die "exitcode=$? output='$output'"
     expected=$(echo '
         .* -----.Removing.image
@@ -72,13 +72,13 @@ nonbuild_tests() {
     $docker run --rm --detach --name $etest_container $etest_image
 
     echo '===== Exec in running container (stdin is terminal if Test is)'
-    output=$(./dent -q $etest_container /bin/echo -n etest 0100 </dev/tty) \
+    output=$(bin/dent -q $etest_container /bin/echo -n etest 0100 </dev/tty) \
         || die "exitcode=$? output='$output'"
     [[ $output = 'etest 0100' ]] || die "bad output='$output'"
     echo "ok output='$output'"
 
     echo '===== Exec in running container (stdin not terminal)'
-    output=$(./dent -q $etest_container /bin/echo -n etest 0110 </dev/null) \
+    output=$(bin/dent -q $etest_container /bin/echo -n etest 0110 </dev/null) \
         || die "exitcode=$? output='$output'"
     [[ $output = 'etest 0110' ]] || die "bad output='$output'"
     echo "ok output='$output'"
@@ -88,7 +88,7 @@ nonbuild_tests() {
     $docker stop -t 0 $etest_container  # Removes itself when stopped
     echo -n "docker create $etest_container: "
     $docker create --rm --name $etest_container $etest_image
-    output=$(./dent -q $etest_container /bin/echo -n etest 0120) \
+    output=$(bin/dent -q $etest_container /bin/echo -n etest 0120) \
         || die "exitcode=$? output='$output'"
     [[ $output = 'etest 0120' ]] || die "bad output='$output'"
     echo "ok output='$output'"
@@ -101,9 +101,9 @@ nonbuild_tests() {
     echo '≡≡≡≡≡ Container creation from pre-existing image'
     echo "docker container rm -f $etest_container"
     $docker container rm -f $etest_container >/dev/null
-    echo "./dent -q -i alpine:latest $etest_container /bin/echo -n etest 0200"
+    echo "bin/dent -q -i alpine:latest $etest_container /bin/echo -n etest 0200"
     exitcode=0; output=$(
-        ./dent -q -i alpine:latest $etest_container /bin/echo -n etest 0200
+        bin/dent -q -i alpine:latest $etest_container /bin/echo -n etest 0200
         ) || exitcode=$?
 
     echo "docker container rm -f $etest_container"
@@ -129,7 +129,7 @@ build_tests() {
     fi
 
     declare -a baseimages=("$@")
-    [[ ${#baseimages} = 0 ]] && baseimages=($(./dent -L -))
+    [[ ${#baseimages} = 0 ]] && baseimages=($(bin/dent -L -))
     for baseimage in "${baseimages[@]}"; do
         for skip in "${skip_images[@]}"; do
             [[ $baseimage = $skip ]] && {
@@ -150,7 +150,7 @@ build_tests() {
         echo -n "docker image rm -f $image: "
         $docker image rm -f "$image" || true
 
-        ./dent $force_rebuild -B $baseimage -t $tag $container true \
+        bin/dent $force_rebuild -B $baseimage -t $tag $container true \
             || adderror $baseimage
 
         echo -n "docker container rm -f $container: "

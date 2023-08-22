@@ -1,1 +1,480 @@
-../dent/dent
+#!/usr/bin/env python3
+'''
+    dent - "Enter" a Docker container, with optional container/image creation
+
+    For detailed documenation, see the README file. If you do not have
+    the full repo, you can find it at <https://github.com/0cjs/contapps/>.
+'''
+
+import  json, os, shutil, stat, string, time
+from    argparse import ArgumentParser, REMAINDER, RawDescriptionHelpFormatter
+from    collections import OrderedDict
+from    os.path import basename, join as pjoin
+from    pwd import getpwuid
+from    sys import stdin, stdout, stderr
+from    tempfile import mkdtemp
+from    textwrap import dedent
+
+#   We use the older high-level API so we work on Python <3.5.
+from    subprocess import call, check_output, DEVNULL, PIPE, CalledProcessError
+
+PROGNAME    = basename(__file__)
+PWENT       = getpwuid(os.getuid())
+ARGS        = None
+
+#   To maximize build speed via use of cache when rebuilding, we want
+#   start with the layers that are largest and least likely to change
+#   and work down towards the smaller/faster/more-likley-to-change
+#   ones.
+#
+#   One thing to keep in mind is that the result produced by
+#   `setup-image` is out of date as soon as the distro releases more
+#   package updates, but `docker build` doesn't know this. So even
+#   when building a new container instead of using an existing one you
+#   should still update its packages.
+#
+DOCKERFILE = '''\
+FROM %{base_image}
+
+#   Because `setup-image` is templated with the user name/uid/etc.,
+#   this will properly not re-use cached versions from other users.
+COPY setup-image /tmp/
+RUN ["/bin/bash", "/tmp/setup-image"]
+
+#   USER and WORKDIR are used by both `docker run` and `start`.
+#   We don't care about CMD because we always specify a command
+#   for `run` and it's ignored by `start`.
+USER %{uname}
+WORKDIR /home/%{uname}
+'''
+
+SETUP_IMAGE = '''\
+#!/usr/bin/env bash
+set -e -o pipefail
+
+die() {
+    local exitcode="\$1"; shift
+    echo 1>&2 "$(basename "$0")" "$@"
+    exit $exitcode
+}
+
+packages() {
+    export LC_ALL=C
+    if type apt 2>/dev/null; then
+        packages_apt
+        ( cd /etc \
+            && sed -i -e '/en_US/s/^# //' -e '/ja_JP/s/^# //' /etc/locale.gen \
+            && etckeeper commit -m 'Enable UTF-8 and other locales' \
+            && locale-gen \
+        )
+    elif type yum 2>&1; then
+        packages_rpm
+    else
+        die 30 "Cannot find apt or yum"
+    fi
+}
+
+UNIVERSAL_PKGS='sudo curl wget git vim man-db'
+
+packages_apt() {
+    echo '-- Package updates/installs'
+    export DEBIAN_FRONTEND=noninteractive
+    #   If we fail to download some updates, e.g. due to no network
+    #   connection or updates no longer being available for old systems,
+    #   we'll live with that.
+    apt-get update || true
+    #   We must install git and set user.name/email before installing
+    #   etckeeper or etckeeper will be unable to commit.
+    apt-get -y install git
+    git config --global user.name 'dent root user'
+    git config --global user.email 'root@dent.nonexistent'
+    #   Install etckeeper as early as posible so we have a record of
+    #   the following installs.
+    cat >> /etc/.gitignore << _____ # The Docker host owns these files
+/hosts
+/resolv.conf
+_____
+    apt-get -y install etckeeper
+    #   ≤14.04 always configures bzr, even if git is installed instead
+    sed -i -e '/^VCS=/s/.*/VCS="git"/' /etc/etckeeper/etckeeper.conf
+    etckeeper init
+    #   It's not worth the time to run dist-upgrade now so as to have
+    #   the latest packages in the image because the image will be out
+    #   of date in a week or two anyway and the user will still have
+    #   to run dist-upgrade himself on new containers.
+    #apt-get -y dist-upgrade
+    #   Ubuntu images appear to turn off installation of manpages and
+    #   other useful stuff.
+    [ -f "/etc/dpkg/dpkg.cfg.d/excludes" ] && {
+        cd /etc
+        git rm -f /etc/dpkg/dpkg.cfg.d/excludes
+        etckeeper commit -m 'Re-enable installs of manpages, etc.'
+    }
+    #   We install a minimal set of packages here because
+    #   the user will use `distro` to install what he needs.
+    apt-get -y install $UNIVERSAL_PKGS locales manpages
+    apt-get clean
+}
+
+packages_rpm() {
+    echo '-- Package updates/installs'
+    #   etckeeper not available in standard CentOS packages at least up to 7
+
+    #   Ensure that man pages are installed with packages if that was disabled.
+    sed -i -e '/tsflags=nodocs/s/^/#/' /etc/yum.conf /etc/dnf/dnf.conf || true
+    yum -y update
+    yum -y install $UNIVERSAL_PKGS man-pages
+}
+
+users() {
+    echo '-- User creation'
+
+    #   Note we do not add the user to the `sudo` group as that will
+    #   introduce a PASSWD: entry even though it's overridden by the
+    #   NOPASSWD: below, and that PASSWD entry will make `sudo -v`
+    #   require a password.
+    local -a groups=() allgroups=(systemd-journal)
+    for group in ${allgroups[@]}; do
+        grep -q "^$group:" /etc/group && groups+=("$group")
+    done
+    groups=$(IFS=, ; echo "${groups[*]}")
+
+    useradd --shell /bin/bash \
+        --create-home --home-dir /home/%{uname}  \
+        --user-group --groups "$groups" \
+        --uid %{uid} -c '%{ugecos}' %{uname}
+    #   Since we have no password, we must let the user sudo without one.
+    mkdir -p /etc/sudoers.d/    # In case we skipped sudo install
+    echo '%{uname} ALL=(ALL:ALL) NOPASSWD:ALL' > /etc/sudoers.d/50-%{uname}
+}
+
+####################################################################
+#   Main
+
+packages
+users
+'''
+
+####################################################################
+#   Utility functions
+
+def qprint(*args, force_print=False, **kwargs):
+    ''' Call `print()` on arguments unless quiet flag is set.
+
+        `force_print` will print even if ARGS.quiet is set; this allows the
+        caller to test on a second condition without having to use ``if``
+        and a duplicate call to `print()`.
+    '''
+    if force_print or not ARGS.quiet:
+        print('-----', *args, **kwargs)
+
+def die(msg):
+    print(PROGNAME + ':', msg, file=stderr)
+    exit(1)
+
+def drcall(command, **kwargs):
+    ''' Execute the `command` with `**kwargs` just as `subprocess.call()`
+        would unless we're doing a dry run, in which case just print
+        `command` to `stderr` and return success.
+
+        This uses stderr rather than stdout becuase user messages are
+        already going to `stdout` and so this allows more easily separating
+        the commands. (When all is well, nothing other than the commands
+        should appear on stderr.)
+    '''
+    if not ARGS.dry_run:
+        return call(command, **kwargs)
+    else:
+        #   Ensure we're not coming out before stuff that's been buffered
+        #   but not yet printed (many systems buffer stdout but not stderr).
+        stdout.flush()
+        print(' '.join(command), file=stderr)
+        stderr.flush()
+        return 0
+
+####################################################################
+#   Docker "API"
+
+DOCKER_COMMAND = ('docker',)
+def docker_setup():
+    ' Determine whether we use ``docker`` or ``sudo docker``. '
+    global DOCKER_COMMAND
+
+    retcode = call(DOCKER_COMMAND + ('info',), stdout=DEVNULL, stderr=DEVNULL)
+    if retcode == 0:
+        return
+
+    #   Before we do any further work, ensure user can sudo and has
+    #   cached credentials.
+    retcode = call(('sudo', '-v'))
+    if retcode != 0:
+        die('Cannot run `docker` as this user and cannot sudo.')
+    DOCKER_COMMAND = ('sudo',) + DOCKER_COMMAND
+
+def docker_inspect(thing, *container_names):
+    ''' Run ``docker `thing` inspect`` on the arguments.
+
+        This parses the returned JSON and returns it as a Python list
+        of dictionaries containing the information about each
+        container it finds.
+
+        ``inspect`` will always produce at least an empty JSON array
+        to stdout, regardless of error status, and since we've already
+        confirmed we can run ``docker`` and talk to the daemon any
+        other errors are highly unlikely. Therefore we simply ignore
+        any return code (letting the error of the list being empty
+        appear later) and let stderr pass through to the user to help
+        debug any problems.
+
+        This is not affected by ``--dry-run`` because this only queries
+        existing configuration and state, and in many cases result of those
+        queries determines what state-changing Docker commands will or
+        would be executed.
+    '''
+    try:
+        command = DOCKER_COMMAND + (thing, 'inspect') + container_names
+        #   Unfortunately, this produces `Error: No such ...` on stderr
+        #   when the image or container doesn't exist. We suppress stdout
+        #   to avoid this printing to the terminal, though this may make
+        #   debugging errors in this program more difficult.
+        output = check_output(command, stderr=DEVNULL)
+    except CalledProcessError as failed:
+        output = failed.output     # Still need to get stdout
+    return json.loads(output.decode('UTF-8'))
+
+def docker_container_start(*container_names):
+    ''' Run `docker container start` on the arguments.
+    '''
+    qprint("Starting container '{}'".format(ARGS.container_name))
+    command = DOCKER_COMMAND + ('container', 'start') + container_names
+    #   Suppress stdout because `docker` prints the names
+    #   of the containers it started.
+    retcode = drcall(command, stdout=DEVNULL)
+    if retcode != 0:
+        die("Couldn't start container")
+    return None
+
+####################################################################
+#   Image and container creation
+
+def build_image():
+    perm_r   = stat.S_IRUSR
+    perm_rx  = perm_r  | stat.S_IXUSR
+    perm_rwx = perm_rx | stat.S_IWUSR
+    if not ARGS.tmpdir:
+        ARGS.tmpdir = tmpdir = mkdtemp(prefix=PROGNAME+'-build-')
+    else:
+        tmpdir = ARGS.tmpdir
+        os.mkdir(tmpdir, perm_rwx)  # We want to die if it already exists
+    qprint('Setting up context for image build in {}'.format(tmpdir),
+        force_print=ARGS.keep_tmpdir)
+
+    class PTemplate(string.Template):
+        delimiter = '%'
+
+    scargs = {
+        'uid': PWENT.pw_uid,
+        'uname': PWENT.pw_name,
+        'ugecos': PWENT.pw_gecos,
+    }
+    with open(pjoin(tmpdir, 'setup-image'), 'w', encoding='UTF-8') as f:
+        os.fchmod(f.fileno(), perm_rx)
+        print(PTemplate(SETUP_IMAGE).substitute(scargs), file=f)
+
+    dfargs = {
+        'base_image': ARGS.base_image,
+        'uname': PWENT.pw_name,
+    }
+    with open(pjoin(tmpdir, 'Dockerfile'), 'w', encoding='UTF-8') as f:
+        os.fchmod(f.fileno(), perm_r)
+        print(PTemplate(DOCKERFILE).substitute(dfargs), file=f)
+
+    if ARGS.force_rebuild:
+        qprint("Removing image '{}' and forcing full rebuild" \
+            .format(image_alias()))
+        drcall(DOCKER_COMMAND + ('rmi', '-f', image_alias()))
+
+    qprint("Building image '{}'".format(image_alias()))
+    command = DOCKER_COMMAND + ('build',)
+    if ARGS.quiet:
+        command += ('--quiet',)
+    if ARGS.force_rebuild:
+        command += ('--no-cache',)
+    command += ('--tag', image_alias(), tmpdir)
+    retcode = drcall(command)
+    if retcode != 0:
+        die("Error building image '{}' from '{}'"
+            .format(image_alias(), ARGS.base_image))
+
+    if not ARGS.keep_tmpdir:
+        shutil.rmtree(tmpdir)
+
+def image_alias():
+    ' "Alias" is name plus tag '
+    if ARGS.image:
+        return ARGS.image
+    else:
+        if not ARGS.base_image:
+            #   It would be nice to display the name of the image we would
+            #   build here, but we can't because it wasn't specified and
+            #   we can't generate it from the base image name.
+            die('Needed a base image but none specified')
+        if not ARGS.tag:
+            ARGS.tag = PWENT.pw_name
+        return '{}/{}:{}'.format(
+            PROGNAME, ARGS.base_image.replace(':', '.'), ARGS.tag)
+
+#   These are the images we know we can build, because we've tested them.
+#   Commented out entries we either used to be able to build but no longer
+#   can (usually because they are old and the package servers are no longer
+#   available) or have a comment explaining that we need to fix something.
+BASE_IMAGES = OrderedDict((
+#   ('debian:8',        {}),
+#   ('debian:9',        {}),
+    ('debian:10',       {}),
+    ('debian:11',       {}),
+    ('debian:12',       {}),
+#   ('ubuntu:14.04',    {}),
+    ('ubuntu:16.04',    {}),
+    ('ubuntu:18.04',    {}),
+    ('ubuntu:20.04',    {}),
+    ('ubuntu:22.04',    {}),
+    ('centos:6',        {}),    # But not with kernel ≥ 4.19 (works on 4.4).
+    ('centos:7',        {}),
+#   ('centos:8',        {}),    # FIXME
+    ('rockylinux:8',    {}),
+#   ('rockylinux:9',    {}),    # FIXME: --allowerasing would do the trick,
+                                # but that's not in CentOS 7.
+    ('fedora:30',       {}),
+    ('fedora:38',       {}),
+))
+
+def create_container():
+    ''' Create a new container for persistent use.
+
+        This is designed simply to exist, and may be stopped and restarted
+        multiple times. After it's been created, we can't change the
+        initial command run when a container is started so we always create
+        it with an initial command of a long sleep (about 68 years, to
+        avoid overflowing any old 32-bit systems) and run our actual
+        commands or shells with ``docker exec`` in that existing container.
+    '''
+    images = docker_inspect('image', image_alias())
+    if images and not ARGS.force_rebuild:
+        qprint("Using existing image '{}'".format(image_alias()))
+    else:
+        build_image()
+    qprint("Creating new container '{}' from image '{}'" \
+        .format(ARGS.container_name, image_alias()))
+    command = DOCKER_COMMAND + ('run',
+        '--name='+ARGS.container_name, '--hostname='+ARGS.container_name,
+        '--rm=false', '--detach=true', '--tty=false',
+        image_alias(), '/bin/sleep', str(2**31-1) )
+    retcode = drcall(command, stdout=DEVNULL)   # stdout prints container ID
+    if retcode != 0:
+        die('Failed to create container {} with command:\n{}' \
+            .format(ARGS.container_name, ' '.join(command)))
+
+def waitforstart(container_name):
+    ''' Wait for a container to start, dieing if it exits immediately.
+
+        The `Docker API`_ does not indicate whether it guarantees it won't
+        return from a start call before the container is started. Regardless,
+        we still need to check that it hasn't exited immediately.
+
+        .. Docker API: https://docs.docker.com/engine/api/v1.30/#operation/ContainerStart
+    '''
+    if ARGS.dry_run: return
+    tries = 50
+    while tries > 0:
+        containers = docker_inspect('container', ARGS.container_name)
+        if not containers:
+            die("Container '{}' was started but is no longer running" \
+                .format(ARGS.container_name))
+        if containers[0]['State']['Running']:
+            break
+        else:
+            time.sleep(0.1)
+            tries -= 1
+    if not tries > 0:
+        die("Cannot start container '{}'".format(ARGS.container_name))
+
+def enter_container():
+    ' Enter the container, doing any dependent actions necessary. '
+    docker_setup()
+
+    containers = docker_inspect('container', ARGS.container_name)
+    if not containers:
+        create_container()      # Also starts
+    elif not containers[0]['State']['Running']:
+        docker_container_start(ARGS.container_name)
+
+    waitforstart(ARGS.container_name)
+
+    #   Rather than using `container.exec_run() and then rewriting the same
+    #   code to deal with the copying of stdin/out/err between what the
+    #   Docker daemon is sending/receiving and our stdin/out/err, just use
+    #   the existing code in the `docker` command to do this. We can also
+    #   do a "process tail call optimization" here since all we would do is
+    #   return the exit code anyway.
+    command = list(DOCKER_COMMAND) + ['exec']
+    command.append('-i')
+    if stdin.isatty():
+        command.append('-t')
+    command.append(ARGS.container_name)
+    command += ARGS.command
+    stdout.flush(); stderr.flush()  # Ensure all our output is complete
+                                    # before this process is replaced.
+    if not ARGS.dry_run:
+        os.execvp(command[0], command)
+        #   Never returns
+    else:
+        print(' '.join(command), file=stderr)
+        exit(0)
+
+####################################################################
+#   Main
+
+def main():
+    p = ArgumentParser(formatter_class=RawDescriptionHelpFormatter,
+        description=dedent('''
+            Start a new process in a Docker container, creating the container
+            and even image if necessary. For detailed documentation, see:
+                https://github.com/0cjs/contapps/
+        '''))
+    p.add_argument('--keep-tmpdir', action='store_true',
+        help='when done, do not delete tmpdir containing build files')
+    p.add_argument('-B', '--base-image',
+        help='base image from which to build container image')
+    p.add_argument('-n', '--dry-run', action='store_true',
+        help="don't execute docker image commands, just print them on stderr")
+    p.add_argument('-i', '--image',
+        help='image to use for creating a new container (created if necessary)')
+    p.add_argument('-L', '--list-base-images', action='store_true',
+        help='list base images this script knows how to configure.'
+             ' (container name must be supplied but is ignored.)')
+    p.add_argument('-q', '--quiet', action='store_true')
+    p.add_argument('-R', '--force-rebuild', action='store_true',
+        help='untag any existing image and rebuild it, ignoring cached images'
+             " (only if container doesn't exist)")
+    p.add_argument('-t', '--tag',
+        help="tag to use for image (default: username); cannot be used with -i")
+    p.add_argument('--tmpdir', help='directory to use for Docker build context')
+    p.add_argument('container_name', help='container name or ID (required)')
+    p.add_argument('command', nargs=REMAINDER, default=['abc', 'def'],
+        help='command to run in container (default: bash -l)')
+    global ARGS; ARGS = p.parse_args()
+
+    #   `default=` does not work with nargs=REMAINDER
+    if not ARGS.command: ARGS.command = ['bash', '-l']
+
+    if ARGS.image and ARGS.tag:
+        die('Use only one of -t and -i')
+
+    if ARGS.list_base_images:
+        for i in BASE_IMAGES.keys(): print(i)
+    else:
+        return enter_container()
+
+if __name__ == '__main__':
+    exit(main())
