@@ -1,6 +1,13 @@
 To-do Lists
 ===========
 
+### Bugs
+
+- The `-i` option, if given an image name that doesn't exist, should
+  not just be creating it `FROM None` but should require a base image.
+  The code to catch the lack of a base image specification when needed
+  seems to be in the wrong place.
+
 ### General
 
 - Add `-v/--verbose` option see what it's doing?
