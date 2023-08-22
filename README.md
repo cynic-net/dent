@@ -163,22 +163,24 @@ This section may not be entirely clear if you've not read the
 
 #### Arguments
 
-* `dent [options] CNAME [COMMAND [ARG ...]]`
+* `dent [options] container_name [--] [command [arg ...]]`
 
-Runs the given command in container _CNAME_ using `docker exec -it
-CNAME bash -l` or similar.
+Runs the given _command_ in container _container_name_ using `docker
+exec -it container_name` or similar. If you supply any _arg_ values
+that start with a hyphen, ensure you use the `--` after the container
+name to avoid these being parsed as options to `dent`.
 
-_CNAME_ is a container name or ID. An existing container will always
-be used (it will be started if it's stopped), otherwise it's the name
-of the container to be created. If you share the host with other
-users, you may want to adopt a container naming convention to avoid
-name collisions. `dent` currently provides no support for this; it
-uses the container name exactly as specified.
+_container_name_ is a container name or ID. An existing container with
+that name will always be used if present (it will be started if it's
+stopped), otherwise it's the name of the container to be created. If
+you share the host with other users, you may want to adopt a container
+naming convention to avoid name collisions. `dent` currently provides
+no support for this; it uses the container name exactly as specified.
 
-The default _COMMAND_ is `bash -l` to give an interactive login shell.
-Curently _COMMAND_ is always run directly, without a login
+The default _command_ is `bash -l` to give an interactive login shell.
+Curently _command_ is always run directly, without a login
 environment. To run a single command in your login environment (e.g.,
-to use a shell alias) use `bash -lc 'cmd arg ...'`.
+to use a shell alias) use `-- bash -lc 'cmd arg ...'`.
 
 The user and initial working directory within the container will be
 the same as specified by the `docker run` command; this is specified
