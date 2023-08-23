@@ -193,7 +193,9 @@ ____
 
 base=$(cd "$(dirname "$0")" && pwd -P)
 cd $base
-. ./activate -q  # -p $(pythonz locate 3.5.10)
+#   You can select another version of Python by using a .python link, e.g.:
+#       rm -rf .build && ln -s $(pythonz locate 3.5.10) .python
+. ./pactivate -q
 
 verbose=false
 nonbuild_tests=nonbuild_tests
