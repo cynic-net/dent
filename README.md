@@ -1,5 +1,5 @@
 `dent`: Create and Enter Docker Containers
-========================================
+==========================================
 
 `dent` ("Docker ENTer") starts a new process (by default an
 interactive command line) in a Docker container, creating the
