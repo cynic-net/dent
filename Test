@@ -2,7 +2,7 @@
 set -e -o pipefail
 trap 'echo 1>&2 FAILED; exit 1' 0
 
-die() { echo 1>&2 "FAILURE:" "$@"; exit 1; }
+die() { echo 1>&2 -e "FAILURE:" "$@"; exit 1; }
 
 errorlist=()
 adderror() { errorlist+=("$*"); }
@@ -37,7 +37,7 @@ dryrun_tests() {
         .* docker.run.--name=
         .*    --rm=false.*--detach=true.*--tty=false.*/bin/sleep.2147483647
         ' | tr -d '\n ' )
-    [[ $output =~ $expected ]] || die "dryrun bad output='$output'"
+    [[ $output =~ $expected ]] || die "dryrun bad output:\n$output"
     echo 'dryrun ok'
     $verbose && {
         echo '──── Dryrun Output ────'
