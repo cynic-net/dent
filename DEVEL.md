@@ -1,13 +1,14 @@
 `dent` Testing and Development
 ==============================
 
-`Test` starts by sourcing `activate`, which builds a virtualenv using
+`Test` starts by sourcing `pactivate`, which builds a virtualenv using
 the first `python3` or `python` found in the path. If you wish to test
-under a different version of Python, you can create an appropriate
-virtualenv manually before you start testing, e.g.:
+under a different version of Python, you can symlink `.python` to it
+before you start testing, e.g.:
 
     rm -rf .build/virtualenv/
-    . ./activate --python=$(pythonz locate 3.7.3)
+    ln -s $(pythonz locate 3.7.17) .python
+    ./Test
 
 `Test` needs to send commands to the Docker daemon using the `docker`
 command. If it can do this with just plain `docker` command it will
