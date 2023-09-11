@@ -370,7 +370,7 @@ def create_container():
         .format(ARGS.CONTANER_NAME, image_alias()))
     command = DOCKER_COMMAND + ('run',
         '--name='+ARGS.CONTANER_NAME, '--hostname='+ARGS.CONTANER_NAME,
-        '--rm=false', '--detach=true', '--tty=false',
+        '--rm=false', '--detach=true', '--tty=false', *ARGS.run_opt,
         image_alias(), '/bin/sleep', str(2**31-1) )
     retcode = drcall(command, stdout=DEVNULL)   # stdout prints container ID
     if retcode != 0:
@@ -408,6 +408,8 @@ def enter_container():
     containers = docker_inspect('container', ARGS.CONTANER_NAME)
     if not containers:
         create_container()      # Also starts
+    elif ARGS.base_image is not None or len(ARGS.run_opt) > 0:
+        die('-B and -r options cannot affect existing containers')
     elif not containers[0]['State']['Running']:
         docker_container_start(ARGS.CONTANER_NAME)
 
@@ -455,6 +457,9 @@ def main():
     p.add_argument('-R', '--force-rebuild', action='store_true',
         help='untag any existing image and rebuild it, ignoring cached images'
              " (only if container doesn't exist)")
+    p.add_argument('-r', '--run-opt', action='append',
+        help="command-line option for 'docker run'; may be specifed multiple"
+            " times. Use '-r -e=FOO=bar' syntax!")
     p.add_argument('--tmpdir', help='directory to use for Docker build context')
 
     #   Args to determine image name
@@ -479,6 +484,9 @@ def main():
         help='command to run in container (default: bash -l)')
 
     global ARGS; ARGS = p.parse_args()
+
+    if ARGS.run_opt is None: ARGS.run_opt = []
+
     #   `default=` does not work with nargs=REMAINDER. We cannot use
     #   nargs='*' because that will cause options in the remainder to be
     #   interpreted as dent options unless the user adds `--` between,

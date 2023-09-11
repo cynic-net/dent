@@ -112,6 +112,8 @@ as manual `docker` commands run by the user.
    mounts, etc.) is fixed when the container is created; if the container
    is stopped or exits and it later restarted with `docker start CNAME`,
    the configuration will be that set up with the original `docker run`.
+   Thus, any `-B`/`--base-image` and `-r`/`--run-opts` command line options
+   can have effect only at container creation time.
 
 4. __Creating the Image__
 
@@ -232,6 +234,18 @@ image:
   layers that would be considered "cached" and reused, rebuilding
   every layer in the `Dockerfile` from scratch. (I.e., use `docker
   build --no-cache`.)
+
+The following optons control container creation:
+* `-r RUN_OPT`, `--run-opt RUN_OPT`: Add options to pass to `docker run` at
+  container creation. These are _not_ split the way the shell does, so
+  `-r "-e FOO=bar"` will not work; it will pass `-e FOO=bar` as a single
+  argument rather than two arguments to `docker run`. Instead, use
+  `-r -e=FOO=bar`.
+
+  Note also that `-r` can be used _only_ when `dent` is creating a new
+  container. If it finds an existing container that it would use, it
+  will generate an error explaining that the `-r` option would have
+  no effect.
 
 The following options are used mainly for development and debugging:
 * `--tmpdir TMPDIR`: The directory to use for the Docker build context

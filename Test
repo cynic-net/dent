@@ -26,7 +26,9 @@ dryrun_tests() {
     #     are properly interleaved.
     #   * As well as --dry-run, this also confirms that various parameters
     #     of the `docker` commands, particularly `docker run`, are correct.
-    output=$(2>&1 bin/dent --dry-run -R -B drytest:xx $contname true) \
+    output=$(2>&1 bin/dent --dry-run -R -B drytest:xx \
+                           --run-opt=-P -r=--cpu-count=1 \
+                           $contname true) \
         || die "exitcode=$? output='$output'"
     expected=$(echo '
         .* -----.Removing.image
@@ -34,8 +36,10 @@ dryrun_tests() {
         .* ---.Building.image.
         .* docker.build.--no-cache
         .* ---.Creating.new.container
-        .* docker.run.--name=
-        .*    --rm=false.*--detach=true.*--tty=false.*/bin/sleep.2147483647
+        .* docker.run.--name=[[:digit:]]*-delete-me
+        .*    --rm=false.*--detach=true.*--tty=false
+        .*    -P.*--cpu-count=1
+        .*   /bin/sleep.2147483647
         ' | tr -d '\n ' )
     [[ $output =~ $expected ]] || die "dryrun bad output:\n$output"
     echo 'dryrun ok'
