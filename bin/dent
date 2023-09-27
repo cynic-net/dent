@@ -76,7 +76,7 @@ packages() {
     fi
 }
 
-UNIVERSAL_PKGS='sudo curl wget git vim man-db'
+UNIVERSAL_PKGS='sudo file curl wget git vim man-db'
 
 packages_apt() {
     echo '-- Package updates/installs'
