@@ -150,11 +150,33 @@ users() {
     echo '%{uname} ALL=(ALL:ALL) NOPASSWD:ALL' > /etc/sudoers.d/50-%{uname}
 }
 
+dot_home() {
+    echo '-- dot-home install'
+    apt-get update; apt-get -y install curl git sudo
+
+    local url_prefix=https://raw.githubusercontent.com/dot-home/dot-home
+    local url_branch=main
+    local url_branch=dev/cjs/23i28/bootstrap-user   # XXX
+    local url="$url_prefix/$url_branch/bootstrap-user"
+    export LOGNAME=%{uname} HOME=~%{uname}
+    export DH_BOOTSTRAP_USERS="$url_prefix/$url_branch/dh/bootstrap-users"
+
+    rm -f $HOME/.profile $HOME/.bash_profile $HOME/.bashrc
+
+    if curl -sfL "$url" | sudo -E -u $LOGNAME bash; then
+        echo "dot-home installed for user $LOGNAME"
+    else
+        echo "WARNING: no dot-home repo found for user $LOGNAME"
+        sleep 3
+    fi
+}
+
 ####################################################################
 #   Main
 
 packages
 users
+dot_home
 '''
 
 ####################################################################
