@@ -298,6 +298,7 @@ def build_image():
 
     qprint("Building image '{}'".format(image_alias()))
     command = DOCKER_COMMAND + ('build',)
+   #command += ('--progress=plain',) # XXX
     if ARGS.quiet:
         command += ('--quiet',)
     if ARGS.force_rebuild:
