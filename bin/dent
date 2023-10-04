@@ -445,6 +445,7 @@ def enter_container():
     #   return the exit code anyway.
     command = list(DOCKER_COMMAND) + ['exec']
     command.append('-i')
+    command.append('--detach-keys=ctrl-@,ctrl-d')
     if stdin.isatty():
         command.append('-t')
     command.append(ARGS.CONTANER_NAME)

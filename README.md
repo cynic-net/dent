@@ -85,6 +85,11 @@ as manual `docker` commands run by the user.
    container using `docker exec` simplifies running multiple commands
    in the container at the same time.
 
+   Dent changes `docker exec`'s detach key sequence (which you normally
+   would not use when using dent) from the default of `ctrl-p,ctrl-q` to
+   `ctrl-@,ctrl-d`. This avoids the annoying "hold" of `ctrl-p` until
+   another character is typed. This currently cannot be overridden.
+
 2. __Starting the Container__
 
    If container _CNAME_ exists but is not running, it must be started
