@@ -386,11 +386,13 @@ def create_container():
         qprint("Using existing image '{}'".format(image_alias()))
     else:
         build_image()
-    qprint("Creating new container '{}' from image '{}'" \
-        .format(ARGS.CONTANER_NAME, image_alias()))
+    user = PWENT.pw_name
+    qprint("Creating new container '{}' from image '{}' for user {}" \
+        .format(ARGS.CONTANER_NAME, image_alias(), user))
     command = DOCKER_COMMAND + ('run',
         '--name='+ARGS.CONTANER_NAME, '--hostname='+ARGS.CONTANER_NAME,
-        '--rm=false', '--detach=true', '--tty=false', *ARGS.run_opt,
+        '--rm=false', '--detach=true', '--tty=false',
+        '--env=LOGNAME='+user, '--env=USER='+user, *ARGS.run_opt,
         image_alias(), '/bin/sleep', str(2**31-1) )
     retcode = drcall(command, stdout=DEVNULL)   # stdout prints container ID
     if retcode != 0:
