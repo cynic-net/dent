@@ -152,8 +152,6 @@ users() {
 
 dot_home() {
     echo '-- dot-home install'
-    apt-get update; apt-get -y install curl git sudo
-
     local url_prefix=https://raw.githubusercontent.com/dot-home/dot-home
     local url_branch=main
     local url="$url_prefix/$url_branch/bootstrap-user"
