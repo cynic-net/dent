@@ -507,6 +507,7 @@ def main():
                 https://github.com/cynic-net/dent
         '''))
 
+    #   General options
     p.add_argument('--keep-tmpdir', action='store_true',
         help='when done, do not delete tmpdir containing build files')
     p.add_argument('-B', '--base-image',
@@ -522,7 +523,7 @@ def main():
             " times. Use '-r -e=FOO=bar' syntax!")
     p.add_argument('--tmpdir', help='directory to use for Docker build context')
 
-    #   Args to determine image name
+    #   Mutually-exclusive options to determine image name
     pi = p.add_mutually_exclusive_group()
     pi.add_argument('-i', '--image',
         help='image to use for creating a new container (created if necessary)')
