@@ -172,6 +172,12 @@ build_tests() {
                 dent 1>&2 $container \
                     bash -c 'echo USER=$USER LOGNAME=$LOGNAME'
             fi
+
+            #   Confirm that user can use sudo.
+            dent $container sudo -v  || {
+                retcode=$(($retcode+1))
+                echo 'ERROR: user cannot sudo'
+            }
         fi
 
         echo -n "docker container rm -f $container: "
