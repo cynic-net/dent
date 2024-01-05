@@ -6,12 +6,13 @@
     the full repo, you can find it at <https://github.com/0cjs/contapps/>.
 '''
 
-VERSION = '0.9.0'
+VERSION = '0.9.2'
 
 import  json, os, shutil, stat, string, time
 from    argparse import ArgumentParser, REMAINDER, RawDescriptionHelpFormatter
 from    collections import OrderedDict
 from    os.path import basename, join as pjoin
+from    pathlib import Path
 from    pwd import getpwuid
 from    sys import stdin, stdout, stderr
 from    tempfile import mkdtemp
@@ -422,6 +423,11 @@ def create_container():
         avoid overflowing any old 32-bit systems) and run our actual
         commands or shells with ``docker exec`` in that existing container.
     '''
+    shared_path_opts = []
+    for s in ARGS.share_dir:
+        p = Path.home().joinpath(s)   # if relative, make absolute
+        shared_path_opts += ['-v={}:{}'.format(p, p)]
+
     images = docker_inspect('image', image_alias())
     if images and not ARGS.force_rebuild:
         qprint("Using existing image '{}'".format(image_alias()))
@@ -433,7 +439,8 @@ def create_container():
     command = DOCKER_COMMAND + ('run',
         '--name='+ARGS.CONTANER_NAME, '--hostname='+ARGS.CONTANER_NAME,
         '--rm=false', '--detach=true', '--tty=false',
-        '--env=LOGNAME='+user, '--env=USER='+user, *ARGS.run_opt,
+        '--env=LOGNAME='+user, '--env=USER='+user,
+        *shared_path_opts, *ARGS.run_opt,
         image_alias(), '/bin/sleep', str(2**31-1) )
     retcode = drcall(command, stdout=DEVNULL)   # stdout prints container ID
     if retcode != 0:
@@ -468,11 +475,20 @@ def enter_container():
     ' Enter the container, doing any dependent actions necessary. '
     docker_setup()
 
+    #   Any arguments that modify the `docker run` command are not
+    #   compatible with existing containers where `docker run` has
+    #   already been executed.
+    not_on_existing = (ARGS.base_image is not None)                     \
+        or (len(ARGS.run_opt) > 0)                                      \
+        or (len(ARGS.share_dir) > 0)
+    not_on_existing_msg =                                               \
+         '-B, -r and -s options cannot affect existing containers'
+
     containers = docker_inspect('container', ARGS.CONTANER_NAME)
     if not containers:
         create_container()      # Also starts
-    elif ARGS.base_image is not None or len(ARGS.run_opt) > 0:
-        die('-B and -r options cannot affect existing containers')
+    elif not_on_existing:
+        die(not_on_existing_msg)
     elif not containers[0]['State']['Running']:
         docker_container_start(ARGS.CONTANER_NAME)
 
@@ -530,6 +546,9 @@ def main():
     p.add_argument('-r', '--run-opt', action='append', default=[],
         help="command-line option for 'docker run'; may be specifed multiple"
             " times. Use '-r -e=FOO=bar' syntax!")
+    p.add_argument('-s', '--share-dir', action='append', default=[],
+        help='Bind mount the given directories to $HOME to the same paths'
+            ' inside the container. Non-absolute paths are relative to $HOME.')
     p.add_argument('--tmpdir', help='directory to use for Docker build context')
 
     #   Mutually-exclusive options to determine image name
