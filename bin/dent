@@ -63,6 +63,7 @@ die() {
 }
 
 packages() {
+    echo '-- Package updates/installs'
     export LC_ALL=C
     if type apt 2>/dev/null; then
         packages_apt
@@ -71,17 +72,18 @@ packages() {
             && etckeeper commit -m 'Enable UTF-8 and other locales' \
             && locale-gen \
         )
-    elif type yum 2>&1; then
+    elif type yum 2>/dev/null; then
         packages_rpm
+    elif type apk 2>/dev/null; then
+        packages_apk
     else
-        die 30 "Cannot find apt or yum"
+        die 30 "Cannot find known package manager."
     fi
 }
 
 UNIVERSAL_PKGS='sudo file curl wget git vim man-db'
 
 packages_apt() {
-    echo '-- Package updates/installs'
     export DEBIAN_FRONTEND=noninteractive
     #   If we fail to download some updates, e.g. due to no network
     #   connection or updates no longer being available for old systems,
@@ -121,7 +123,6 @@ _____
 }
 
 packages_rpm() {
-    echo '-- Package updates/installs'
     #   etckeeper not available in standard CentOS packages at least up to 7
 
     #   Ensure that man pages are installed with packages if that was disabled.
@@ -130,7 +131,13 @@ packages_rpm() {
     yum -y install $UNIVERSAL_PKGS man-pages
 }
 
-users() {
+packages_apk() {
+    #   XXX This should set up etckeeper.
+    apk update
+    apk add $UNIVERSAL_PKGS man-pages man-pages-posix
+}
+
+users_generic() {
     echo '-- User creation'
 
     #   Note we do not add the user to the `sudo` group as that will
@@ -150,6 +157,21 @@ users() {
     #   Since we have no password, we must let the user sudo without one.
     mkdir -p /etc/sudoers.d/    # In case we skipped sudo install
     echo '%{uname} ALL=(ALL:ALL) NOPASSWD:ALL' > /etc/sudoers.d/50-%{uname}
+}
+
+users_alpine() {
+    echo '-- User creation (alpine)'
+
+    #   Alpine `adduser` has no option to set the group, but unlike this
+    #   command on some other systems, it automatically puts the user in
+    #   her own group with the same name and id.
+    #addgroup --gid %{uid} %{uname}
+
+    #   -D avoids assigning a password
+    adduser -D --uid %{uid} -g '%{ugecos}' \
+        --shell /bin/bash --home /home/%{uname}   %{uname}
+
+    #   XXX Should `adduser %{uname} $group` for any groups?
 }
 
 dot_home() {
@@ -174,7 +196,7 @@ dot_home() {
 #   Main
 
 packages
-users
+users_%{useradd}
 dot_home
 '''
 
@@ -292,25 +314,16 @@ def build_image():
     qprint('Setting up context for image build in {}'.format(tmpdir),
         force_print=ARGS.keep_tmpdir)
 
+    conf = BASE_IMAGES.get(ARGS.base_image) or {}
     class PTemplate(string.Template):
         delimiter = '%'
 
-    scargs = {
-        'uid': PWENT.pw_uid,
-        'uname': PWENT.pw_name,
-        'ugecos': PWENT.pw_gecos,
-    }
-
+    #   DOCKERFILE Config
+    #
     #   The pre-setup command is run before /tmp/setup-image.
     #   This defaults to 'true' (a no-op), but can be set in the BASE_IMAGES
     #   config dict to e.g. install Bash so we can run setup-image.
-    conf = BASE_IMAGES.get(ARGS.base_image) or {}
     presetup_command = conf.get('presetup') or 'true'
-
-    with open(pjoin(tmpdir, 'setup-image'), 'w', encoding='UTF-8') as f:
-        os.fchmod(f.fileno(), perm_rx)
-        print(PTemplate(SETUP_IMAGE).substitute(scargs), file=f)
-
     dfargs = {
         'base_image':       ARGS.base_image,
         'presetup_command': presetup_command,
@@ -319,6 +332,19 @@ def build_image():
     with open(pjoin(tmpdir, 'Dockerfile'), 'w', encoding='UTF-8') as f:
         os.fchmod(f.fileno(), perm_r)
         print(PTemplate(DOCKERFILE).substitute(dfargs), file=f)
+
+    #   SETUP_IMAGE config
+    #
+    useradd = conf.get('useradd') or 'generic'
+    scargs = {
+        'uid':              PWENT.pw_uid,
+        'uname':            PWENT.pw_name,
+        'ugecos':           PWENT.pw_gecos,
+        'useradd':          useradd,
+    }
+    with open(pjoin(tmpdir, 'setup-image'), 'w', encoding='UTF-8') as f:
+        os.fchmod(f.fileno(), perm_rx)
+        print(PTemplate(SETUP_IMAGE).substitute(scargs), file=f)
 
     if ARGS.force_rebuild:
         qprint("Removing image '{}' and forcing full rebuild" \
@@ -361,7 +387,7 @@ def image_alias():
 #   can (usually because they are old and the package servers are no longer
 #   available) or have a comment explaining that we need to fix something.
 BASE_IMAGES = OrderedDict((
-    ('alpine:3.19',     { 'presetup': 'apk add bash' }),
+    ('alpine:3.19',     { 'presetup': 'apk add bash', 'useradd': 'alpine' }),
 #   ('debian:8',        {}),
 #   ('debian:9',        {}),
     ('debian:10',       {}),
