@@ -302,6 +302,34 @@ def docker_container_start(*container_names):
 ####################################################################
 #   Image and container creation
 
+class PTemplate(string.Template):
+    delimiter = '%'
+
+def dockerfile():
+    ' Return the text of `DOCKERFILE` with template substitution done. '
+
+    #   The pre-setup command is run before /tmp/setup-image.
+    #   This defaults to 'true' (a no-op), but can be set in the BASE_IMAGES
+    #   config dict to e.g. install Bash so we can run setup-image.
+    presetup_command = IMAGE_CONF.get('presetup') or 'true'
+    dfargs = {
+        'base_image':       ARGS.base_image,
+        'presetup_command': presetup_command,
+        'uname':            PWENT.pw_name,
+    }
+    return PTemplate(DOCKERFILE).substitute(dfargs)
+
+def setup_image():
+    ' Return the text of `SETUP_IMAGE` with template substitution done. '
+    useradd = IMAGE_CONF.get('useradd') or 'generic'
+    scargs = {
+        'uid':              PWENT.pw_uid,
+        'uname':            PWENT.pw_name,
+        'ugecos':           PWENT.pw_gecos,
+        'useradd':          useradd,
+    }
+    return PTemplate(SETUP_IMAGE).substitute(scargs)
+
 def build_image():
     perm_r   = stat.S_IRUSR
     perm_rx  = perm_r  | stat.S_IXUSR
@@ -314,37 +342,13 @@ def build_image():
     qprint('Setting up context for image build in {}'.format(tmpdir),
         force_print=ARGS.keep_tmpdir)
 
-    conf = BASE_IMAGES.get(ARGS.base_image) or {}
-    class PTemplate(string.Template):
-        delimiter = '%'
-
-    #   DOCKERFILE Config
-    #
-    #   The pre-setup command is run before /tmp/setup-image.
-    #   This defaults to 'true' (a no-op), but can be set in the BASE_IMAGES
-    #   config dict to e.g. install Bash so we can run setup-image.
-    presetup_command = conf.get('presetup') or 'true'
-    dfargs = {
-        'base_image':       ARGS.base_image,
-        'presetup_command': presetup_command,
-        'uname':            PWENT.pw_name,
-    }
     with open(pjoin(tmpdir, 'Dockerfile'), 'w', encoding='UTF-8') as f:
         os.fchmod(f.fileno(), perm_r)
-        print(PTemplate(DOCKERFILE).substitute(dfargs), file=f)
+        print(dockerfile(), file=f)
 
-    #   SETUP_IMAGE config
-    #
-    useradd = conf.get('useradd') or 'generic'
-    scargs = {
-        'uid':              PWENT.pw_uid,
-        'uname':            PWENT.pw_name,
-        'ugecos':           PWENT.pw_gecos,
-        'useradd':          useradd,
-    }
     with open(pjoin(tmpdir, 'setup-image'), 'w', encoding='UTF-8') as f:
         os.fchmod(f.fileno(), perm_rx)
-        print(PTemplate(SETUP_IMAGE).substitute(scargs), file=f)
+        print(setup_image(), file=f)
 
     if ARGS.force_rebuild:
         qprint("Removing image '{}' and forcing full rebuild" \
@@ -507,6 +511,9 @@ def main():
                 https://github.com/cynic-net/dent
         '''))
 
+    #   Things we can print with -P and their functions producing the text.
+    PRINT_FILE_ARGS =  {'dockerfile': dockerfile, 'setup-image': setup_image}
+
     #   General options
     p.add_argument('--keep-tmpdir', action='store_true',
         help='when done, do not delete tmpdir containing build files')
@@ -514,6 +521,8 @@ def main():
         help='base image from which to build container image')
     p.add_argument('-n', '--dry-run', action='store_true',
         help="don't execute docker image commands, just print them on stderr")
+    p.add_argument('-P', '--print-file', choices=PRINT_FILE_ARGS,
+        help='Instead of building image, print given file to stdout.')
     p.add_argument('-q', '--quiet', action='store_true')
     p.add_argument('-R', '--force-rebuild', action='store_true',
         help='untag any existing image and rebuild it, ignoring cached images'
@@ -554,10 +563,16 @@ def main():
     #   which is inconvenient.
     if not ARGS.COMMAND: ARGS.COMMAND = ['bash', '-l']
 
+    #   If we know the given base image name, get any special configuration
+    #   for it. Otherwise we use a generic config.
+    global IMAGE_CONF; IMAGE_CONF = BASE_IMAGES.get(ARGS.base_image) or {}
+
     if ARGS.list_base_images:
         for i in BASE_IMAGES.keys(): print(i)
     elif ARGS.version:
         print('{} version {}'.format(p.prog, VERSION))
+    elif ARGS.print_file and ARGS.CONTANER_NAME:
+        print(PRINT_FILE_ARGS[ARGS.print_file]())
     elif ARGS.CONTANER_NAME:
         return enter_container()
     else:
