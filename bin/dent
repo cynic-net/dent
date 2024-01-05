@@ -527,7 +527,7 @@ def main():
     p.add_argument('-R', '--force-rebuild', action='store_true',
         help='untag any existing image and rebuild it, ignoring cached images'
              " (only if container doesn't exist)")
-    p.add_argument('-r', '--run-opt', action='append',
+    p.add_argument('-r', '--run-opt', action='append', default=[],
         help="command-line option for 'docker run'; may be specifed multiple"
             " times. Use '-r -e=FOO=bar' syntax!")
     p.add_argument('--tmpdir', help='directory to use for Docker build context')
@@ -554,8 +554,6 @@ def main():
         help='command to run in container (default: bash -l)')
 
     global ARGS; ARGS = p.parse_args()
-
-    if ARGS.run_opt is None: ARGS.run_opt = []
 
     #   `default=` does not work with nargs=REMAINDER. We cannot use
     #   nargs='*' because that will cause options in the remainder to be
