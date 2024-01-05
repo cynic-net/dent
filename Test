@@ -224,7 +224,7 @@ while true; do case "$1" in
     --skip-nonbuild)    shift; nonbuild_tests=skip;;
     --skip-build)       shift; build_tests=skip;;
     --keep-images)      shift; keep_images=true;;
-    --no-force-rebuild) shift; force_rebuild=;;
+    -f|--no-force-rebuild) shift; force_rebuild=;;  # ("fast" mode)
     -*)                 usage "Unknown option '$1'";;
     *)                  break;;
 esac; done
