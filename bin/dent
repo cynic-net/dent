@@ -38,6 +38,8 @@ ARGS        = None
 DOCKERFILE = '''\
 FROM %{base_image}
 
+RUN %{presetup_command}
+
 #   Because `setup-image` is templated with the user name/uid/etc.,
 #   this will properly not re-use cached versions from other users.
 COPY setup-image /tmp/
@@ -298,13 +300,21 @@ def build_image():
         'uname': PWENT.pw_name,
         'ugecos': PWENT.pw_gecos,
     }
+
+    #   The pre-setup command is run before /tmp/setup-image.
+    #   This defaults to 'true' (a no-op), but can be set in the BASE_IMAGES
+    #   config dict to e.g. install Bash so we can run setup-image.
+    conf = BASE_IMAGES.get(ARGS.base_image) or {}
+    presetup_command = conf.get('presetup') or 'true'
+
     with open(pjoin(tmpdir, 'setup-image'), 'w', encoding='UTF-8') as f:
         os.fchmod(f.fileno(), perm_rx)
         print(PTemplate(SETUP_IMAGE).substitute(scargs), file=f)
 
     dfargs = {
-        'base_image': ARGS.base_image,
-        'uname': PWENT.pw_name,
+        'base_image':       ARGS.base_image,
+        'presetup_command': presetup_command,
+        'uname':            PWENT.pw_name,
     }
     with open(pjoin(tmpdir, 'Dockerfile'), 'w', encoding='UTF-8') as f:
         os.fchmod(f.fileno(), perm_r)
@@ -351,6 +361,7 @@ def image_alias():
 #   can (usually because they are old and the package servers are no longer
 #   available) or have a comment explaining that we need to fix something.
 BASE_IMAGES = OrderedDict((
+    ('alpine:3.19',     { 'presetup': 'apk add bash' }),
 #   ('debian:8',        {}),
 #   ('debian:9',        {}),
     ('debian:10',       {}),
