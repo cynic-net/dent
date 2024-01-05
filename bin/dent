@@ -6,7 +6,7 @@
     the full repo, you can find it at <https://github.com/0cjs/contapps/>.
 '''
 
-VERSION = '0.9.3'
+VERSION = '0.9.4'
 
 import  json, os, shutil, stat, string, time
 from    argparse import ArgumentParser, REMAINDER, RawDescriptionHelpFormatter
@@ -31,7 +31,7 @@ ARGS        = None
 #   ones.
 #
 #   One thing to keep in mind is that the result produced by
-#   `setup-image` is out of date as soon as the distro releases more
+#   `setup-pkg` is out of date as soon as the distro releases more
 #   package updates, but `docker build` doesn't know this. So even
 #   when building a new container instead of using an existing one you
 #   should still update its packages.
@@ -40,11 +40,10 @@ DOCKERFILE = '''\
 FROM %{base_image}
 
 RUN %{presetup_command}
-
-#   Because `setup-image` is templated with the user name/uid/etc.,
-#   this will properly not re-use cached versions from other users.
-COPY setup-image /tmp/
-RUN ["/bin/bash", "/tmp/setup-image"]
+COPY setup-pkg /tmp/
+RUN ["/bin/bash", "/tmp/setup-pkg"]
+COPY setup-user /tmp/
+RUN ["/bin/bash", "/tmp/setup-user"]
 
 #   USER and WORKDIR are used by both `docker run` and `start`.
 #   We don't care about CMD because we always specify a command
@@ -53,7 +52,7 @@ USER %{uname}
 WORKDIR /home/%{uname}
 '''
 
-SETUP_IMAGE = '''\
+SETUP_HEADER = '''\
 #!/usr/bin/env bash
 set -e -o pipefail
 
@@ -62,6 +61,10 @@ die() {
     echo 1>&2 "$(basename "$0")" "$@"
     exit $exitcode
 }
+'''
+
+SETUP_PKG = SETUP_HEADER + '''
+UNIVERSAL_PKGS='sudo file curl wget git vim man-db'
 
 packages() {
     echo '-- Package updates/installs'
@@ -81,8 +84,6 @@ packages() {
         die 30 "Cannot find known package manager."
     fi
 }
-
-UNIVERSAL_PKGS='sudo file curl wget git vim man-db'
 
 packages_apt() {
     export DEBIAN_FRONTEND=noninteractive
@@ -138,6 +139,10 @@ packages_apk() {
     apk add $UNIVERSAL_PKGS man-pages man-pages-posix
 }
 
+packages
+'''
+
+SETUP_USER = SETUP_HEADER + '''
 users_generic() {
     echo '-- User creation'
 
@@ -198,10 +203,6 @@ dot_home() {
     fi
 }
 
-####################################################################
-#   Main
-
-packages
 users_%{useradd}
 dot_home
 '''
@@ -306,7 +307,7 @@ def docker_container_start(*container_names):
     return None
 
 ####################################################################
-#   Image and container creation
+#   Image configuration scripts and related files
 
 class PTemplate(string.Template):
     delimiter = '%'
@@ -314,9 +315,9 @@ class PTemplate(string.Template):
 def dockerfile():
     ' Return the text of `DOCKERFILE` with template substitution done. '
 
-    #   The pre-setup command is run before /tmp/setup-image.
+    #   The pre-setup command is run before /tmp/setup-*
     #   This defaults to 'true' (a no-op), but can be set in the BASE_IMAGES
-    #   config dict to e.g. install Bash so we can run setup-image.
+    #   config dict to e.g. install Bash so we can run the setup scripts.
     presetup_command = IMAGE_CONF.get('presetup') or 'true'
     dfargs = {
         'base_image':       ARGS.base_image,
@@ -325,16 +326,28 @@ def dockerfile():
     }
     return PTemplate(DOCKERFILE).substitute(dfargs)
 
-def setup_image():
-    ' Return the text of `SETUP_IMAGE` with template substitution done. '
+def setup_pkg():
+    ' Return the text of `SETUP_PKG` with template substitution done. '
     useradd = IMAGE_CONF.get('useradd') or 'generic'
-    scargs = {
+    #   We avoid putting any user-related template arguments here so that
+    #   this won't change based on user, thus letting us avoid regenerating
+    #   this (fairly heavy) layer when user info changes.
+    template_args = { }
+    return PTemplate(SETUP_PKG).substitute(template_args)
+
+def setup_user():
+    ' Return the text of `SETUP_USER` with template substitution done. '
+    useradd = IMAGE_CONF.get('useradd') or 'generic'
+    template_args = {
         'uid':              PWENT.pw_uid,
         'uname':            PWENT.pw_name,
         'ugecos':           PWENT.pw_gecos,
         'useradd':          useradd,
     }
-    return PTemplate(SETUP_IMAGE).substitute(scargs)
+    return PTemplate(SETUP_USER).substitute(template_args)
+
+####################################################################
+#   Image and container creation
 
 def build_image():
     perm_r   = stat.S_IRUSR
@@ -352,9 +365,13 @@ def build_image():
         os.fchmod(f.fileno(), perm_r)
         print(dockerfile(), file=f)
 
-    with open(pjoin(tmpdir, 'setup-image'), 'w', encoding='UTF-8') as f:
+    with open(pjoin(tmpdir, 'setup-pkg'), 'w', encoding='UTF-8') as f:
         os.fchmod(f.fileno(), perm_rx)
-        print(setup_image(), file=f)
+        print(setup_pkg(), file=f)
+
+    with open(pjoin(tmpdir, 'setup-user'), 'w', encoding='UTF-8') as f:
+        os.fchmod(f.fileno(), perm_rx)
+        print(setup_user(), file=f)
 
     if ARGS.force_rebuild:
         qprint("Removing image '{}' and forcing full rebuild" \
@@ -533,7 +550,11 @@ def main():
         '''))
 
     #   Things we can print with -P and their functions producing the text.
-    PRINT_FILE_ARGS =  {'dockerfile': dockerfile, 'setup-image': setup_image}
+    PRINT_FILE_ARGS =  {
+        'dockerfile':   dockerfile,
+        'setup-pkg':    setup_pkg,
+        'setup-user':   setup_user,
+    }
 
     #   General options
     p.add_argument('--keep-tmpdir', action='store_true',
