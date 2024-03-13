@@ -102,7 +102,33 @@ nonbuild_tests() {
         $docker image rm -f "$etest_image" || true
     }
 
-    echo '≡≡≡≡≡ Container creation from pre-existing image'
+    echo '≡≡≡≡≡ Container creation from missing pre-existing image '
+    #   We need to confirm that dent tries to download the image, rather than
+    #   trying to build it locally. This means the image must not already
+    #   be on the existing system, but we can't delete local images because
+    #   they might be in use by other images or containers. So the best option
+    #   is to use an image that doesn't exist at all, and simply confirm the
+    #   attempt to download and its failure.
+    #
+    #   XXX Unfortunately this test actually tries to download the image
+    #   (in order to fail doing it), and so it's slow. There seems to be no
+    #   way to tell `docker run` not to pull the image but just fail
+    #   immediately.
+    badname='k7k22zhtj6bv:nonexistimage'
+    echo "docker container rm -f $etest_container"
+    $docker container rm -f $etest_container >/dev/null
+    echo "bin/dent -q -i $badname $etest_container /bin/echo -n etest 0220"
+    exitcode=0; output=$(
+        bin/dent -q -i "$badname" $etest_container /bin/echo -n etest 0220
+        ) || exitcode=$?
+    [[ $exitcode -eq 1 ]] || die "exitcode=$? ≠ 1; output='$output'"
+    [[ $output = '' ]] || die "bad output='$output'"
+    echo "ok output='$output'"
+
+    #   XXX This assumes the presence of `alpine:latest`, which needs to
+    #   be maually downloaded to make the test pass. We should probably
+    #   be creating our own local (and tiny) image to use instead.
+    echo '≡≡≡≡≡ Container creation from present pre-existing image'
     echo "docker container rm -f $etest_container"
     $docker container rm -f $etest_container >/dev/null
     echo "bin/dent -q -i alpine:latest $etest_container /bin/echo -n etest 0200"

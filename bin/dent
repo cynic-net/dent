@@ -6,7 +6,7 @@
     the full repo, you can find it at <https://github.com/0cjs/contapps/>.
 '''
 
-VERSION = '0.9.4'
+VERSION = '0.9.5'
 
 import  json, os, shutil, stat, string, time
 from    argparse import ArgumentParser, REMAINDER, RawDescriptionHelpFormatter
@@ -451,7 +451,12 @@ def create_container():
         shared_path_opts += ['-v={}:{}'.format(p, p)]
 
     images = docker_inspect('image', image_alias())
-    if images and not ARGS.force_rebuild:
+    if ARGS.force_rebuild:
+        build_image()
+    elif images or ARGS.image:
+        #   If we found an image, use it. If we were explicitly requested
+        #   to use a particular image, make sure we do not try to build it
+        #   locally but let `docker run` try to download it.
         qprint("Using existing image '{}'".format(image_alias()))
     else:
         build_image()
@@ -579,8 +584,8 @@ def main():
 
     #   Mutually-exclusive options to determine image name
     pi = p.add_mutually_exclusive_group()
-    pi.add_argument('-i', '--image',
-        help='image to use for creating a new container (created if necessary)')
+    pi.add_argument('-i', '--image', help='existing image to use'
+        ' for creating a new container (downloaded if necessary)')
     pi.add_argument('-t', '--tag',
         help="tag to use for image (default: username); cannot be used with -i")
 
