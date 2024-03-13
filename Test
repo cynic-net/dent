@@ -102,6 +102,24 @@ nonbuild_tests() {
         $docker image rm -f "$etest_image" || true
     }
 
+    echo '≡≡≡≡≡ Container creation from missing pre-existing image '
+    #   We need to confirm that dent tries to download the image, rather than
+    #   trying to build it locally. This means the image must not already
+    #   be on the existing system, but we can't delete local images because
+    #   they might be in use by other images or containers. So the best option
+    #   is to use an image that doesn't exist at all, and simply confirm the
+    #   attempt to download and its failure.
+    badname='k7k22zhtj6bv:nonexistimage'
+    echo "docker container rm -f $etest_container"
+    $docker container rm -f $etest_container >/dev/null
+    echo "bin/dent -q -i $badname $etest_container /bin/echo -n etest 0220"
+    exitcode=0; output=$(
+        bin/dent -q -i "$badname" $etest_container /bin/echo -n etest 0220
+        ) || exitcode=$?
+    [[ $exitcode -eq 0 ]] || die "exitcode=$? output='$output'"
+    [[ $output = 'etest 0200' ]] || die "bad output='$output'"
+    echo "ok output='$output'"
+
     echo '≡≡≡≡≡ Container creation from pre-existing image'
     echo "docker container rm -f $etest_container"
     $docker container rm -f $etest_container >/dev/null
