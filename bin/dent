@@ -6,7 +6,7 @@
     the full repo, you can find it at <https://github.com/0cjs/contapps/>.
 '''
 
-VERSION = '0.9.5'
+VERSION = '0.9.6'
 
 import  json, os, shutil, stat, string, time
 from    argparse import ArgumentParser, REMAINDER, RawDescriptionHelpFormatter
@@ -414,7 +414,16 @@ def image_alias():
 #   can (usually because they are old and the package servers are no longer
 #   available) or have a comment explaining that we need to fix something.
 BASE_IMAGES = OrderedDict((
+    #   XXX Since we run the setup script that installs packages with bash,
+    #   we use presetup on alpine:* to add bash _before_ we try to run the
+    #   setup script. But this is annoying because we need to specify it
+    #   by hand; probably we should fix this to allow matching alpine:*,
+    #   while having our tested images list include :3.19 etc. (We don't
+    #   want it including alpine:* or even alpine:latest below, because
+    #   that's not tested any more once they release a new version.
     ('alpine:3.19',     { 'presetup': 'apk add bash', 'useradd': 'alpine' }),
+    ('alpine:3.20',     { 'presetup': 'apk add bash', 'useradd': 'alpine' }),
+    ('alpine:latest',   { 'presetup': 'apk add bash', 'useradd': 'alpine' }),
 #   ('debian:8',        {}),
 #   ('debian:9',        {}),
     ('debian:10',       {}),
