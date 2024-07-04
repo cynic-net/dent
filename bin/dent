@@ -6,7 +6,7 @@
     the full repo, you can find it at <https://github.com/0cjs/contapps/>.
 '''
 
-VERSION = '0.9.6'
+VERSION = '0.9.7'
 
 import  json, os, shutil, stat, string, time
 from    argparse import ArgumentParser, REMAINDER, RawDescriptionHelpFormatter
@@ -434,9 +434,9 @@ BASE_IMAGES = OrderedDict((
     ('ubuntu:18.04',    {}),
     ('ubuntu:20.04',    {}),
     ('ubuntu:22.04',    {}),
-    ('centos:6',        {}),    # But not with kernel ≥ 4.19 (works on 4.4).
-    ('centos:7',        {}),
-#   ('centos:8',        {}),    # FIXME
+#   ('centos:6',        {}),    # But not with kernel ≥ 4.19 (works on 4.4).
+#   ('centos:7',        {}),    # Package repos are gone.
+#   ('centos:8',        {}),    # Package repos are gone.
     ('rockylinux:8',    {}),
 #   ('rockylinux:9',    {}),    # FIXME: --allowerasing would do the trick,
                                 # but that's not in CentOS 7.
