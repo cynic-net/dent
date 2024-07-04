@@ -190,17 +190,18 @@ build_tests() {
             #   for non-login shells: no `-l` here!) because this is supposed
             #   to be emulating a user environment, even though login(1) or
             #   similar is not being run.
-            if ! dent $container  bash -c 'echo USER=$USER LOGNAME=$LOGNAME' \
+            if ! bin/dent $container  \
+                   bash -c 'echo USER=$USER LOGNAME=$LOGNAME' \
                    | grep "USER=$USER LOGNAME=$LOGNAME"
             then
                 retcode=$(($retcode+1))
                 echo 'ERROR: $USER/$LOGNAME not set?'
-                dent 1>&2 $container \
+                bin/dent 1>&2 $container \
                     bash -c 'echo USER=$USER LOGNAME=$LOGNAME'
             fi
 
             #   Confirm that user can use sudo.
-            dent $container sudo -v  || {
+            bin/dent $container sudo -v  || {
                 retcode=$(($retcode+1))
                 echo 'ERROR: user cannot sudo'
             }
