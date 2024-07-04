@@ -150,7 +150,7 @@ users_generic() {
     #   introduce a PASSWD: entry even though it's overridden by the
     #   NOPASSWD: below, and that PASSWD entry will make `sudo -v`
     #   require a password.
-    local -a groups=() allgroups=(systemd-journal)
+    local -a groups=() allgroups=(wheel sudo systemd-journal)
     for group in ${allgroups[@]}; do
         grep -q "^$group:" /etc/group && groups+=("$group")
     done
@@ -163,7 +163,18 @@ users_generic() {
 
     #   Since we have no password, we must let the user sudo without one.
     mkdir -p /etc/sudoers.d/    # In case we skipped sudo install
-    echo '%{uname} ALL=(ALL:ALL) NOPASSWD:ALL' > /etc/sudoers.d/50-%{uname}
+    cat << _____ > /etc/sudoers.d/50-%{uname}
+#   We change verifypw from its default of `all` to `any` for the user so
+#   that if NOPASSWD: is lacking on any entries in /etc/sudoers (as it is
+#   for, e.g., %sudo group on Debian) the user can still `sudo -v` without
+#   a password.
+Defaults:%{uname} verifypw = any
+
+#   We add explicit sudo for the user of this container for those systems
+#   where adding the user to the wheel or sudo group doesn't do that.
+%{uname} ALL=(ALL:ALL) NOPASSWD:ALL
+_____
+    chmod 0750 /etc/sudoers.d/[0-9]*
 }
 
 users_alpine() {
@@ -339,6 +350,8 @@ def setup_user():
     ' Return the text of `SETUP_USER` with template substitution done. '
     useradd = IMAGE_CONF.get('useradd') or 'generic'
     template_args = {
+        'sudo':             '%sudo',    # Avoid having to escape
+        'wheel':            '%wheel',   #    /etc/sudoers groups
         'uid':              PWENT.pw_uid,
         'uname':            PWENT.pw_name,
         'ugecos':           PWENT.pw_gecos,
