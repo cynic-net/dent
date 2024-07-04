@@ -5,7 +5,10 @@ trap 'echo 1>&2 FAILED; exit 1' 0
 die() { echo 1>&2 -e "FAILURE:" "$@"; exit 1; }
 
 errorlist=()
-adderror() { errorlist+=("$*"); }
+adderror() {
+    echo 2>&1 '***** ERROR:' "$@"
+    errorlist+=("$*");
+}
 
 setup_docker() {
     declare -g docker=docker
@@ -194,17 +197,14 @@ build_tests() {
                    bash -c 'echo USER=$USER LOGNAME=$LOGNAME' \
                    | grep "USER=$USER LOGNAME=$LOGNAME"
             then
-                retcode=$(($retcode+1))
-                echo 'ERROR: $USER/$LOGNAME not set?'
+                adderror "$baseimage:" '$USER/$LOGNAME not set?'
                 bin/dent 1>&2 $container \
                     bash -c 'echo USER=$USER LOGNAME=$LOGNAME'
             fi
 
             #   Confirm that user can use sudo.
-            bin/dent $container sudo -v  || {
-                retcode=$(($retcode+1))
-                echo 'ERROR: user cannot sudo'
-            }
+            bin/dent $container sudo -v -S </dev/null \
+                || adderror "$baseimage: user cannot sudo"
         fi
 
         echo -n "docker container rm -f $container: "
@@ -215,12 +215,12 @@ build_tests() {
         }
     done
 
-    retcode=0
-    for e in "${errorlist[@]}"; do
-        echo "ERROR: $e"
-        retcode=$(($retcode+1))
-    done
-    [[ $retcode -eq 0 ]] || exit $retcode
+    errcount=${#errorlist[@]}
+    if [[ $errcount -gt 0 ]]; then
+        echo "===== ${errcount} Errors:"
+        for e in "${errorlist[@]}"; do echo "  $e"; done
+        exit 1
+    fi
 }
 
 skip() {
