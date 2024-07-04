@@ -6,7 +6,7 @@
     the full repo, you can find it at <https://github.com/0cjs/contapps/>.
 '''
 
-VERSION = '0.9.7'
+VERSION = '0.9.8'
 
 import  json, os, shutil, stat, string, time
 from    argparse import ArgumentParser, REMAINDER, RawDescriptionHelpFormatter
@@ -120,7 +120,8 @@ _____
     }
     #   We install a minimal set of packages here because
     #   the user will use `distro` to install what he needs.
-    apt-get -y install $UNIVERSAL_PKGS locales manpages
+    apt-get -y install $UNIVERSAL_PKGS \
+        locales manpages apt-file procps xz-utils
     apt-get clean
 }
 
