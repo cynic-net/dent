@@ -205,6 +205,7 @@ build_tests() {
             #   similar is not being run.
             testvar USER "$USER"
             testvar LOGNAME "$LOGNAME"
+            testvar HOST_HOSTNAME "$HOSTNAME"
 
             #   Confirm that user can use sudo.
             bin/dent $container sudo -v -S </dev/null \

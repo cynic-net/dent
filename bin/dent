@@ -6,17 +6,19 @@
     the full repo, you can find it at <https://github.com/0cjs/contapps/>.
 '''
 
-VERSION = '0.9.8'
+VERSION = '0.9.10'
 
-import  json, os, shutil, stat, string, time
 from    argparse import ArgumentParser, REMAINDER, RawDescriptionHelpFormatter
 from    collections import OrderedDict
 from    os.path import basename, join as pjoin
 from    pathlib import Path
+from    platform import node
 from    pwd import getpwuid
 from    sys import stdin, stdout, stderr
 from    tempfile import mkdtemp
 from    textwrap import dedent
+import  json, os, shutil, stat, string, time
+
 
 #   We use the older high-level API so we work on Python <3.5.
 from    subprocess import call, check_output, DEVNULL, PIPE, CalledProcessError
@@ -488,8 +490,9 @@ def create_container():
         .format(ARGS.CONTANER_NAME, image_alias(), user))
     command = DOCKER_COMMAND + ('run',
         '--name='+ARGS.CONTANER_NAME, '--hostname='+ARGS.CONTANER_NAME,
-        '--rm=false', '--detach=true', '--tty=false',
+        '--env=HOST_HOSTNAME='+node(),
         '--env=LOGNAME='+user, '--env=USER='+user,
+        '--rm=false', '--detach=true', '--tty=false',
         *shared_path_opts, *ARGS.run_opt,
         image_alias(), '/bin/sleep', str(2**31-1) )
     retcode = drcall(command, stdout=DEVNULL)   # stdout prints container ID
