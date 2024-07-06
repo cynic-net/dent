@@ -6,7 +6,7 @@
     the full repo, you can find it at <https://github.com/0cjs/contapps/>.
 '''
 
-VERSION = '0.10.0'
+VERSION = '0.10.1'
 
 from    argparse import ArgumentParser, REMAINDER, RawDescriptionHelpFormatter
 from    collections import OrderedDict
@@ -396,7 +396,8 @@ def build_image():
 
     qprint("Building image '{}'".format(image_alias()))
     command = DOCKER_COMMAND + ('build',)
-   #command += ('--progress=plain',) # XXX
+    if ARGS.progress:
+        command += ('--progress=plain',)
     if ARGS.quiet:
         command += ('--quiet',)
     if ARGS.force_rebuild:
@@ -607,6 +608,8 @@ def main():
         help="don't execute docker image commands, just print them on stderr")
     p.add_argument('-P', '--print-file', choices=PRINT_FILE_ARGS,
         help='Instead of building image, print given file to stdout.')
+    p.add_argument('-V', '--progress', action='store_true',
+        help='Set --progress=plain on `docker build` to see all build output.')
     p.add_argument('-q', '--quiet', action='store_true')
     p.add_argument('-R', '--force-rebuild', action='store_true',
         help='untag any existing image and rebuild it, ignoring cached images'
