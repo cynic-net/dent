@@ -37,6 +37,7 @@ To-do Lists
 
 ### Container Setup Script
 
+- Set container `/etc/localtime` to match host
 - Split the setup script into two layers: package updates and
   user-specific stuff so that we can get layer sharing for the
   installed and updated packages for two different users building the
