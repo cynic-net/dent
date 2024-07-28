@@ -59,7 +59,7 @@ SETUP_HEADER = '''\
 set -e -o pipefail
 
 die() {
-    local exitcode="\$1"; shift
+    local exitcode="$1"; shift
     echo 1>&2 "$(basename "$0")" "$@"
     exit $exitcode
 }
