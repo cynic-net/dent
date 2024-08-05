@@ -29,7 +29,7 @@ dryrun_tests() {
     #     are properly interleaved.
     #   * As well as --dry-run, this also confirms that various parameters
     #     of the `docker` commands, particularly `docker run`, are correct.
-    output=$(2>&1 bin/dent --dry-run -R -B drytest:xx \
+    output=$(2>&1 dent --dry-run -R -B drytest:xx \
                            --run-opt=-P -r=--cpu-count=1 \
                            $contname true) \
         || die "exitcode=$? output='$output'"
@@ -79,13 +79,13 @@ nonbuild_tests() {
     $docker run --rm --detach --name $etest_container $etest_image
 
     echo '===== Exec in running container (stdin is terminal if Test is)'
-    output=$(bin/dent -q $etest_container /bin/echo -n etest 0100 </dev/tty) \
+    output=$(dent -q $etest_container /bin/echo -n etest 0100 </dev/tty) \
         || die "exitcode=$? output='$output'"
     [[ $output = 'etest 0100' ]] || die "bad output='$output'"
     echo "ok output='$output'"
 
     echo '===== Exec in running container (stdin not terminal)'
-    output=$(bin/dent -q $etest_container /bin/echo -n etest 0110 </dev/null) \
+    output=$(dent -q $etest_container /bin/echo -n etest 0110 </dev/null) \
         || die "exitcode=$? output='$output'"
     [[ $output = 'etest 0110' ]] || die "bad output='$output'"
     echo "ok output='$output'"
@@ -95,7 +95,7 @@ nonbuild_tests() {
     $docker stop -t 0 $etest_container  # Removes itself when stopped
     echo -n "docker create $etest_container: "
     $docker create --rm --name $etest_container $etest_image
-    output=$(bin/dent -q $etest_container /bin/echo -n etest 0120) \
+    output=$(dent -q $etest_container /bin/echo -n etest 0120) \
         || die "exitcode=$? output='$output'"
     [[ $output = 'etest 0120' ]] || die "bad output='$output'"
     echo "ok output='$output'"
@@ -120,9 +120,9 @@ nonbuild_tests() {
     badname='k7k22zhtj6bv:nonexistimage'
     echo "docker container rm -f $etest_container"
     $docker container rm -f $etest_container >/dev/null
-    echo "bin/dent -q -i $badname $etest_container /bin/echo -n etest 0220"
+    echo "dent -q -i $badname $etest_container /bin/echo -n etest 0220"
     exitcode=0; output=$(
-        bin/dent -q -i "$badname" $etest_container /bin/echo -n etest 0220
+        dent -q -i "$badname" $etest_container /bin/echo -n etest 0220
         ) || exitcode=$?
     [[ $exitcode -eq 1 ]] || die "exitcode=$? ≠ 1; output='$output'"
     [[ $output = '' ]] || die "bad output='$output'"
@@ -134,9 +134,9 @@ nonbuild_tests() {
     echo '≡≡≡≡≡ Container creation from present pre-existing image'
     echo "docker container rm -f $etest_container"
     $docker container rm -f $etest_container >/dev/null
-    echo "bin/dent -q -i alpine:latest $etest_container /bin/echo -n etest 0200"
+    echo "dent -q -i alpine:latest $etest_container /bin/echo -n etest 0200"
     exitcode=0; output=$(
-        bin/dent -q -i alpine:latest $etest_container /bin/echo -n etest 0200
+        dent -q -i alpine:latest $etest_container /bin/echo -n etest 0200
         ) || exitcode=$?
 
     echo "docker container rm -f $etest_container"
@@ -162,7 +162,7 @@ build_tests() {
     fi
 
     declare -a baseimages=("$@")
-    [[ ${#baseimages} = 0 ]] && baseimages=($(bin/dent -L))
+    [[ ${#baseimages} = 0 ]] && baseimages=($(dent -L))
     for baseimage in "${baseimages[@]}"; do
         for skip in "${skip_images[@]}"; do
             [[ $baseimage = $skip ]] && {
@@ -183,7 +183,7 @@ build_tests() {
         echo -n "docker image rm -f $image: "
         $docker image rm -f "$image" || true
 
-        if ! bin/dent $force_rebuild -B $baseimage -t $tag $container true
+        if ! dent $force_rebuild -B $baseimage -t $tag $container true
         then
             adderror $baseimage
         else
@@ -192,11 +192,11 @@ build_tests() {
             testvar() {
                 VAR="$1"; shift
                 VALUE="$1"; shift
-                if ! bin/dent $container bash -c "echo $VAR=\$$VAR" \
+                if ! dent $container bash -c "echo $VAR=\$$VAR" \
                      | grep -q "$VAR=$VALUE"
                 then
                     adderror "$baseimage: expected $VAR='$VALUE'"
-                    bin/dent 1>&2 $container bash -c "echo $VAR=\$$VAR"
+                    dent 1>&2 $container bash -c "echo $VAR=\$$VAR"
                 fi
             }
             #   Confirm that we're ensuring $USER and $LOGNAME are set (even
@@ -208,7 +208,7 @@ build_tests() {
             testvar HOST_HOSTNAME "$HOSTNAME"
 
             #   Confirm that user can use sudo.
-            bin/dent $container sudo -v -S </dev/null \
+            dent $container sudo -v -S </dev/null \
                 || adderror "$baseimage: user cannot sudo"
         fi
 

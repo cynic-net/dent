@@ -1,0 +1,25 @@
+[project]
+version = '1.0.0.dev1'
+name = 'dent'
+description = 'Enter interactive shells in Docker containers and manage persistent containers'
+authors = [
+    { name = 'Curt J. Sampson', email = 'cjs@cynic.net' },
+    { name = 'Nishant Rodrigues', email = 'nishantjr@gmail.com' },
+]
+readme = 'README.md'
+urls.homepage = 'https://github.com/cynic-net/dent'
+urls.source = 'https://github.com/cynic-net/dent'
+urls.tracker = 'https://github.com/cynic-net/dent/issues'
+
+requires-python = '>=3.6'
+dependencies = []
+
+[project.scripts]
+dent            = 'dent:main'
+
+[build-system]
+requires = ['setuptools']
+build-backend = 'setuptools.build_meta'
+
+[tool.pytest.ini_options]
+testpaths = ['src']

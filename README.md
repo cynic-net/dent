@@ -59,10 +59,27 @@ worthwhile.
 Installation
 ------------
 
-`dent` is a stand-alone Python script. You'll need to have `python3`
-available in your path; there are no other dependencies other than the
-Python standard library. You can simply copy the script wherever you like,
-or create a symlink in your path pointing to `dent` in any location.
+`dent` is can be installed from [PyPI][pi-dent], or intalled or cloned from
+[GitHub][gh-dent].
+
+Basic install:
+
+    pip install dent
+    dent --help
+
+Using [pactivate]'s `pae`:
+
+    pae -c dent dent
+    pae dent --help
+
+Using [pipx]:
+
+    pipx run dent --help
+
+From GitHub:
+
+    pip install dent@git+https://github.com/cynic-net/dent@refs/heads/dev/cjs/24h05/pypi-package
+    dent --help
 
 
 Operation Overview
@@ -263,6 +280,12 @@ The following options are used mainly for development and debugging:
 
 
 <!-------------------------------------------------------------------->
+[tmate]: https://tmate.io/
+
 [py-docker]: https://pypi.org/project/docker/
 [root]: https://github.com/0cjs/sedoc/blob/master/docker/security.md#leveraging-docker-for-root-access
-[tmate]: https://tmate.io/
+
+[gh-dent]: https://github.com/cynic-net/dent
+[pactivate]: https://github.com/cynic-net/pactivate
+[pi-dent]: https://pypi.org/project/dent
+[pipx]: https://pipx.pypa.io/
