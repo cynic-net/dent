@@ -14,12 +14,18 @@ urls.tracker = 'https://github.com/cynic-net/dent/issues'
 requires-python = '>=3.6'
 dependencies = []
 
+####################################################################
+
 [project.scripts]
 dent            = 'dent:main'
+#   `dockerd-proxy` installation is handled by `setup.cfg`;
+#   see that file for important information on this.
 
 [build-system]
 requires = ['setuptools']
 build-backend = 'setuptools.build_meta'
+
+####################################################################
 
 [tool.pytest.ini_options]
 testpaths = ['src']
