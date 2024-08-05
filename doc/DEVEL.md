@@ -15,8 +15,7 @@ command. If it can do this with just plain `docker` command it will
 use that; otherwise it will use `sudo docker` instead. If neither of
 these methods work you can set the `DOCKER_HOST` environment variable
 to a socket you can use to access the daemon; in some cases the
-`dockerd-proxy` command in the directory above this one may help with
-this.
+`dockerd-proxy` command included in this package may help with this.
 
 The tests consist of two parts:
 1. The "non-build" tests that check `dent` functionality outside of

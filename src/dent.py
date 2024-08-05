@@ -6,7 +6,7 @@
     the full repo, you can find it at <https://github.com/0cjs/contapps/>.
 '''
 
-VERSION = '1.0.0.dev1'
+VERSION = '1.0.0.dev2'
 
 from    argparse import ArgumentParser, REMAINDER, RawDescriptionHelpFormatter
 from    collections import OrderedDict
