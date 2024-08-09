@@ -14,7 +14,7 @@ from    os.path import basename, join as pjoin
 from    pathlib import Path
 from    platform import node
 from    pwd import getpwuid
-from    sys import stdin, stdout, stderr
+from    sys import argv, stdin, stdout, stderr
 from    tempfile import mkdtemp
 from    textwrap import dedent
 import  json, os, shutil, stat, string, time
@@ -23,7 +23,7 @@ import  json, os, shutil, stat, string, time
 #   We use the older high-level API so we work on Python <3.5.
 from    subprocess import call, check_output, DEVNULL, PIPE, CalledProcessError
 
-PROGNAME    = basename(__file__)
+PROGNAME    = os.path.basename(argv[0])
 PWENT       = getpwuid(os.getuid())
 ARGS        = None
 
