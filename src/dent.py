@@ -6,10 +6,9 @@
     the full repo, you can find it at <https://github.com/0cjs/contapps/>.
 '''
 
-VERSION = '1.0.0.dev2'
-
 from    argparse import ArgumentParser, REMAINDER, RawDescriptionHelpFormatter
 from    collections import OrderedDict
+from    importlib.metadata  import version
 from    os.path import basename, join as pjoin
 from    pathlib import Path
 from    platform import node
@@ -661,7 +660,8 @@ def main():
     if ARGS.list_base_images:
         for i in BASE_IMAGES.keys(): print(i)
     elif ARGS.version:
-        print('{} version {}'.format(p.prog, VERSION))
+        print(f'{p.prog} version {version(p.prog)}')
+
     elif ARGS.print_file and ARGS.CONTANER_NAME:
         print(PRINT_FILE_ARGS[ARGS.print_file]())
     elif ARGS.CONTANER_NAME:

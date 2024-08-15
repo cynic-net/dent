@@ -1,5 +1,5 @@
 [project]
-version = '1.0.0.dev2'
+version = '1.0.0.dev3'
 name = 'dent'
 description = 'Enter interactive shells in Docker containers and manage persistent containers'
 authors = [
@@ -11,7 +11,7 @@ urls.homepage = 'https://github.com/cynic-net/dent'
 urls.source = 'https://github.com/cynic-net/dent'
 urls.tracker = 'https://github.com/cynic-net/dent/issues'
 
-requires-python = '>=3.6'
+requires-python = '>=3.8'
 dependencies = []
 
 ####################################################################
