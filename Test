@@ -252,11 +252,9 @@ ____
 
 base=$(cd "$(dirname "$0")" && pwd -P)
 cd $base
-#   You can select another version of Python by using a .python link, e.g.:
-#       rm -rf .build && ln -s $(pythonz locate 3.5.10) .python
-. ./pactivate -q
 
 verbose=false
+small_clean=false
 nonbuild_tests=nonbuild_tests
 build_tests=build_tests
 keep_images=false
@@ -268,10 +266,20 @@ while true; do case "$1" in
     --skip-build)       shift; build_tests=skip;;
     --keep-images)      shift; keep_images=true;;
     -f|--no-force-rebuild) shift; force_rebuild=;;  # ("fast" mode)
+    -c|--small-clean)   shift; small_clean=true;;
     -*)                 usage "Unknown option '$1'";;
     *)                  break;;
 esac; done
 
+$small_clean && {
+    #   Even an editable package needs to be re-installed to update certain
+    #   things, such as pyproject.toml metadata (e.g. the version number)
+    #   and the non-Python scripts installed by setup.cfg.
+    rm -rf .build/virtualenv/
+}
+#   You can select another version of Python by using a .python link, e.g.:
+#       rm -rf .build && ln -s $(pythonz locate 3.5.10) .python
+. ./pactivate -q
 setup_docker
 dryrun_tests
 $nonbuild_tests

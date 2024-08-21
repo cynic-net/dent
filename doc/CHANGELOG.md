@@ -24,6 +24,7 @@ commit ID.
 
 ### dev
 - Initial release as Python distribution package.
+- Test: Add -c "small clean" option that clears/reinstalls virtualenv
 
 
 
