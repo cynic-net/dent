@@ -5,7 +5,8 @@ These are the instructions for building a new release of r8format and
 uploading it to PyPI. This is of interest only to r8format developers;
 users of r8format can safely ignore this.
 
-XXX: Some of this should be scripted.
+This is mostly a manual process, but a little bit of it is automated with
+the [`build-release`](../build-release) script in this repo.
 
 Release Process
 ---------------
@@ -24,15 +25,12 @@ Release Process
 
 2. Build and check the release.
    - Change the current working directory to the project root.
-   - Activate the virtualenv: `source .build/virtalenv/bin/activate`.
-     (Or use `pae -a .` if you use pactiavte's pae tool.)
-   - `pip install build twine`.
-   - `rm -f dist/*`
-   - `pyproject-build`.
-   - `twine check --strict dist/*`  (the strict opt. fails on warnings)
+   - Run `./build-release`, which will do a few checks of the configuration
+     (these are far from comprehensive), activate the virtualenv, install
+     `build` and `twine`, and run `pyproject-build` and `twine check`.
    - Fix anything broken.
 
 3. Do the release
    - `git tag v0.x.x`
    - `git push r main tag v0.x.x`   (replace `r` with your remote name)
-   - `twine upload dist/*`          (ensure you have your API token handy)
+   - `./build-release -u`           (ensure you have your API token handy)
