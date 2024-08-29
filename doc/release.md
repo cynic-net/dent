@@ -34,3 +34,15 @@ Release Process
    - `git tag v0.x.x`
    - `git push r main tag v0.x.x`   (replace `r` with your remote name)
    - `./build-release -u`           (ensure you have your API token handy)
+
+
+Versioning Notes
+----------------
+
+- `.devN`/`.betaN`/etc. versions can be uploaded to PyPI, but these will be
+  marked as "pre-release." They will show up at the top of the release
+  history, but the "latest version" shown on the top page of the project
+  and installed with `pip install dent` will be unchanged, and the pages
+  for the pre-release versions will have a warning icon and "Stable version
+  available" button. Pre-release versions can be installed from PyPI if
+  asked for explicitly: `pip install 'dent@1.0.0.dev3'`.
