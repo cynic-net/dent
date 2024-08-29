@@ -1,5 +1,5 @@
 [project]
-version = '1.0.0.dev3'
+version = '1.0.0.beta1'
 name = 'dent'
 description = 'Enter interactive shells in Docker containers and manage persistent containers'
 authors = [
