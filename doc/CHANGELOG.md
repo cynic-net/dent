@@ -23,6 +23,8 @@ will be tagged, but specific releases can also be fetched via the Git
 commit ID.
 
 ### dev
+
+### 1.0.0.dev3
 - Initial release as Python distribution package.
 - Test: Add -c "small clean" option that clears/reinstalls virtualenv
 
