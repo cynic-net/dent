@@ -24,9 +24,10 @@ commit ID.
 
 ### dev
 
-### 1.0.0.dev3 1.0.0.beta1 (2024-08-29)
+### 1.0.0 (2024-08-29)
 - Initial release as Python distribution package.
 - Test: Add -c "small clean" option that clears/reinstalls virtualenv
+- Note: This was also released as 1.0.0.dev3 and 1.0.0.beta1.
 
 
 
