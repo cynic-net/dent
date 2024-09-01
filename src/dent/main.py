@@ -4,11 +4,8 @@
     the full repo, you can find it at <https://github.com/cynic-net/dent/>.
 '''
 
-#   XXX This suppresses ~60 errors that we need to clean up, but some of
-#   them may go away by themselves as we rework our usage of global vars.
-# mypy: disable-error-code="name-defined, attr-defined, assignment, var-annotated"
-
-from    argparse import ArgumentParser, REMAINDER, RawDescriptionHelpFormatter
+from    argparse  import (
+        ArgumentParser, REMAINDER, RawDescriptionHelpFormatter, Namespace)
 from    collections import OrderedDict
 from    importlib.metadata  import version
 from    os.path import basename, join as pjoin
@@ -20,13 +17,17 @@ from    tempfile import mkdtemp
 from    textwrap import dedent
 import  json, os, shutil, stat, string, time
 
+#   We use some older typing stuff to maintain 3.8 compatibility.
+from    typing  import Dict, Tuple
+
 
 #   We use the older high-level API so we work on Python <3.5.
 from    subprocess import call, check_output, DEVNULL, PIPE, CalledProcessError
 
 PROGNAME    = os.path.basename(argv[0])
 PWENT       = getpwuid(os.getuid())
-ARGS        = None
+ARGS        : Namespace
+IMAGE_CONF  : Dict[str,str]
 
 #   To maximize build speed via use of cache when rebuilding, we want
 #   start with the layers that are largest and least likely to change
@@ -262,7 +263,7 @@ def drcall(command, **kwargs):
 ####################################################################
 #   Docker "API"
 
-DOCKER_COMMAND = ('docker',)
+DOCKER_COMMAND:Tuple[str,...] = ('docker',)
 def docker_setup():
     ' Determine whether we use ``docker`` or ``sudo docker``. '
     global DOCKER_COMMAND
@@ -347,8 +348,7 @@ def setup_pkg():
     #   We avoid putting any user-related template arguments here so that
     #   this won't change based on user, thus letting us avoid regenerating
     #   this (fairly heavy) layer when user info changes.
-    template_args = { }
-    return PTemplate(SETUP_PKG).substitute(template_args)
+    return PTemplate(SETUP_PKG).substitute({})
 
 def setup_user():
     ' Return the text of `SETUP_USER` with template substitution done. '
