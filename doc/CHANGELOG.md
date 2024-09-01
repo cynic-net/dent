@@ -23,6 +23,7 @@ will be tagged, but specific releases can also be fetched via the Git
 commit ID.
 
 ### dev
+- Significant internal re-organisation; should not be visible to users.
 
 ### 1.0.0 (2024-08-29)
 - Initial release as Python distribution package.

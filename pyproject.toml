@@ -1,5 +1,5 @@
 [project]
-version = '1.0.0'
+version = '1.0.1.dev0'
 name = 'dent'
 description = 'Enter interactive shells in Docker containers and manage persistent containers'
 authors = [
@@ -17,7 +17,7 @@ dependencies = []
 ####################################################################
 
 [project.scripts]
-dent            = 'dent:main'
+dent            = 'dent.main:main'
 #   `dockerd-proxy` installation is handled by `setup.cfg`;
 #   see that file for important information on this.
 
