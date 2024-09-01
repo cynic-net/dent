@@ -1,6 +1,4 @@
-#!/usr/bin/env python3
-'''
-    dent - "Enter" a Docker container, with optional container/image creation
+''' dent - "Enter" a Docker container, with optional container/image creation
 
     For detailed documenation, see the README file. If you do not have
     the full repo, you can find it at <https://github.com/0cjs/contapps/>.
@@ -668,6 +666,3 @@ def main():
         return enter_container()
     else:
         die('Internal argument parsing error.')     # Should never happen.
-
-if __name__ == '__main__':
-    exit(main())
