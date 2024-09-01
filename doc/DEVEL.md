@@ -18,13 +18,15 @@ to a socket you can use to access the daemon; in some cases the
 `dockerd-proxy` command included in this package may help with this.
 
 The tests consist of several parts:
-1. Unit tests in `src/**/*.pt` files, run with `pytest`.
-2. Dry run tests that check `dent` functionality without actually running
+1. Type checking with `mypy`, which may be skipped with `.Test -T`. (The
+   `./Test -v` option will make mypy verbose, as well as other tests below.)
+2. Unit tests in `src/**/*.pt` files, run with `pytest`.
+3. Dry run tests that check `dent` functionality without actually running
    Docker by using the `dent --dry-run` option.
-3. The "non-build" tests that check `dent` functionality outside of
+4. The "non-build" tests that check `dent` functionality outside of
    building images (i.e., just creating, starting and entering containers).
    These may be skipped by specifying `--skip-nonbuild` option.
-4. The "build" tests that build images. Builds based on a default set of
+5. The "build" tests that build images. Builds based on a default set of
    base images will be tested, but you can override this by specifying one
    or more specific image names using the `-B` option, e.g., `.Test -B
    debian:9 -B centos:7`) The build tests may be skipped entirely with the

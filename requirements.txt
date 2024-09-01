@@ -1,4 +1,5 @@
 #   These are development requirements only.
 #   Runtime requirements are in pyproject.toml.
 -e ./
+mypy
 pytest-pt

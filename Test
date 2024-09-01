@@ -20,6 +20,13 @@ setup_docker() {
     fi
 }
 
+type_check() {
+    echo '≡≡≡≡≡ Type check'
+    local args=()
+    $verbose && args+=('-v')
+    mypy "${args[@]}"   # default args in pyproject.toml.
+}
+
 unit_tests() {
     echo '≡≡≡≡≡ Unit tests'
     pytest #"$@"        # default args in pyproject.toml.
@@ -243,6 +250,7 @@ usage() {
     sed -e 's/^        //' <<____ 1>&2
         Usage: $0 [OPTS …] [-- [PYTEST-ARGS]]
         OPTS (see doc/DEVEL.md for more details):
+            -T, --skip-typecheck
             --skip-nonbuild
             --skip-build
             -B IMGNAME
@@ -260,6 +268,7 @@ command cd "$base"
 
 verbose=false
 small_clean=false
+skip_typecheck=false
 nonbuild_tests=nonbuild_tests
 build_tests=build_tests
 baseimages=()               # base images to test; default `dent -L`
@@ -274,6 +283,7 @@ while true; do case "$1" in
     --keep-images)      shift; keep_images=true;;
     -f|--no-force-rebuild) shift; force_rebuild=;;  # ("fast" mode)
     -c|--small-clean)   shift; small_clean=true;;
+    -T|--skip-typechck) shift; skip_typecheck=true;;
     --)                 shift; break;;              # remaining args for pytest
     -*)                 usage "Unknown option '$1'";;
     *)                  break;;
@@ -289,6 +299,7 @@ $small_clean && {
 #       rm -rf .build && ln -s $(pythonz locate 3.5.10) .python
 . ./pactivate -q
 setup_docker
+$skip_typecheck || type_check
 unit_tests "$@"
 dryrun_tests
 $nonbuild_tests

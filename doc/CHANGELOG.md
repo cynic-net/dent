@@ -25,6 +25,7 @@ commit ID.
 ### dev
 - Significant internal re-organisation; should not be visible to users.
 - Test: Now use -B NAME to specify images; all args after -- passed to pytest
+- Test: Now use mypy.
 
 ### 1.0.0 (2024-08-29)
 - Initial release as Python distribution package.

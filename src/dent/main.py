@@ -4,6 +4,10 @@
     the full repo, you can find it at <https://github.com/cynic-net/dent/>.
 '''
 
+#   XXX This suppresses ~60 errors that we need to clean up, but some of
+#   them may go away by themselves as we rework our usage of global vars.
+# mypy: disable-error-code="name-defined, attr-defined, assignment, var-annotated"
+
 from    argparse import ArgumentParser, REMAINDER, RawDescriptionHelpFormatter
 from    collections import OrderedDict
 from    importlib.metadata  import version
