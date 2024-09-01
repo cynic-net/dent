@@ -1,5 +1,4 @@
 #   These are development requirements only.
 #   Runtime requirements are in pyproject.toml.
 -e ./
-pytest>=7
-pytest_pt
+pytest-pt

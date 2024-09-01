@@ -1,5 +1,5 @@
 [project]
-version = '1.0.1.dev0'
+version = '1.0.1.dev1'
 name = 'dent'
 description = 'Enter interactive shells in Docker containers and manage persistent containers'
 authors = [
@@ -28,4 +28,5 @@ build-backend = 'setuptools.build_meta'
 ####################################################################
 
 [tool.pytest.ini_options]
-testpaths = ['src']
+testpaths = ['src']     # used only when pytest started from rootdir
+addopts   = ['-q', '-p pytest_pt', '--doctest-modules']

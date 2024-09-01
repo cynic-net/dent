@@ -17,32 +17,35 @@ these methods work you can set the `DOCKER_HOST` environment variable
 to a socket you can use to access the daemon; in some cases the
 `dockerd-proxy` command included in this package may help with this.
 
-The tests consist of two parts:
-1. The "non-build" tests that check `dent` functionality outside of
-   building images (creating, starting and entering containers). These
-   are run first and may be skipped by specifying `--skip-nonbuild`
-   option.
-2. The "build" tests that build images. Builds based on a default set
-   of base images will be tested, but you can override this by
-   specifying specific image names (e.g., `debian:9 centos:7`) as
-   arguments after the options. The build tests may be skipped
-   entirely with the `--skip-build` option.
+The tests consist of several parts:
+1. Unit tests in `src/**/*.pt` files, run with `pytest`.
+2. Dry run tests that check `dent` functionality without actually running
+   Docker by using the `dent --dry-run` option.
+3. The "non-build" tests that check `dent` functionality outside of
+   building images (i.e., just creating, starting and entering containers).
+   These may be skipped by specifying `--skip-nonbuild` option.
+4. The "build" tests that build images. Builds based on a default set of
+   base images will be tested, but you can override this by specifying one
+   or more specific image names using the `-B` option, e.g., `.Test -B
+   debian:9 -B centos:7`) The build tests may be skipped entirely with the
+   `--skip-build` option.
 
 `Test` options related to images are:
-- `--no-force-rebuild`: Do not force a rebuild of layers that are
-  already cached. This means the code to build those layers isn't
-  tested, but speeds tests of other code (especially that which builds
-  subsequent layers).
-- `--keep-images`: Do not remove the images created by the build
-  tests. (The test containers are always removed.)
+- `--no-force-rebuild`: Do not force a rebuild of layers that are already
+  cached. This means the code to build those layers isn't tested, but
+  speeds tests of other code (especially that which builds subsequent
+  layers).
+- `--keep-images`: Do not remove the images created by the build tests,
+  allowing you to examine them after the tests have been completed. (The
+  test containers are always removed.)
 
-When changing things related to the image build, use of the above two
-options and careful management of cached layers can greatly speed
-testing. In particular, changes to the container can be iteratively
-tested and debugged by making them a separate layer at the end and
-then after testing moved into an earlier layer. When doing this,
-ensure you remove or invalidate the cached final layer (by changing
-the Dockerfile line or a file it references).
+When changing things related to the image build, use of the
+`--no-force-rebuild` and `--keep-images` options and careful management of
+cached layers can greatly speed testing. In particular, changes to the
+container can be iteratively tested and debugged by making them a separate
+layer at the end and then after testing moved into an earlier layer. When
+doing this, ensure you remove or invalidate the cached final layer (by
+changing the Dockerfile line or a file it references).
 
 ### Test System Bugs
 

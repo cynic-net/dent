@@ -20,6 +20,11 @@ setup_docker() {
     fi
 }
 
+unit_tests() {
+    echo '≡≡≡≡≡ Unit tests'
+    pytest #"$@"        # default args in pyproject.toml.
+}
+
 dryrun_tests() {
     echo '≡≡≡≡≡ Dry run tests'
 
@@ -161,7 +166,6 @@ build_tests() {
         echo "Kernel $kern_release: skipping images ${skip_images[@]}"
     fi
 
-    declare -a baseimages=("$@")
     [[ ${#baseimages} = 0 ]] && baseimages=($(dent -L))
     for baseimage in "${baseimages[@]}"; do
         for skip in "${skip_images[@]}"; do
@@ -237,10 +241,11 @@ skip() {
 usage() {
     [[ "$@" ]] && echo 1>&2 "$@"
     sed -e 's/^        //' <<____ 1>&2
-        Usage: $0 [args] [base_image ...]
-        Options:
+        Usage: $0 [OPTS …] [-- [PYTEST-ARGS]]
+        OPTS (see doc/DEVEL.md for more details):
             --skip-nonbuild
             --skip-build
+            -B IMGNAME
             --keep-images
             --no-force-rebuild
 ____
@@ -257,16 +262,19 @@ verbose=false
 small_clean=false
 nonbuild_tests=nonbuild_tests
 build_tests=build_tests
+baseimages=()               # base images to test; default `dent -L`
 keep_images=false
 force_rebuild=--force-rebuild
 while true; do case "$1" in
     -h|--help)          usage;;
-    -v|--verbose)       shift; verbose=true;;
+    -v|--verbose)       shift; verbose=true;;       # does not affect pytest
     --skip-nonbuild)    shift; nonbuild_tests=skip;;
     --skip-build)       shift; build_tests=skip;;
+    -B)                 shift; baseimages+=("$1"); shift;;
     --keep-images)      shift; keep_images=true;;
     -f|--no-force-rebuild) shift; force_rebuild=;;  # ("fast" mode)
     -c|--small-clean)   shift; small_clean=true;;
+    --)                 shift; break;;              # remaining args for pytest
     -*)                 usage "Unknown option '$1'";;
     *)                  break;;
 esac; done
@@ -281,9 +289,10 @@ $small_clean && {
 #       rm -rf .build && ln -s $(pythonz locate 3.5.10) .python
 . ./pactivate -q
 setup_docker
+unit_tests "$@"
 dryrun_tests
 $nonbuild_tests
-$build_tests "$@"
+$build_tests "${baseimages[@]}"
 
 trap '' 0
 echo OK

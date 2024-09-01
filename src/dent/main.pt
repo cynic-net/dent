@@ -1,0 +1,10 @@
+from    dent.main  import share_args
+from    pathlib  import Path
+
+def test_share_args():
+    home = str(Path.home())
+    ps = share_args(['/etc/foo', '/home/bar/baz', 'quux'], 'rw')
+    assert [    '-v=/etc/foo:/etc/foo:rw',
+                '-v=/home/bar/baz:/home/bar/baz:rw',
+               f'-v={home}/quux:{home}/quux:rw',
+           ] == ps
