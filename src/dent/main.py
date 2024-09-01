@@ -1,7 +1,7 @@
 ''' dent - "Enter" a Docker container, with optional container/image creation
 
     For detailed documenation, see the README file. If you do not have
-    the full repo, you can find it at <https://github.com/0cjs/contapps/>.
+    the full repo, you can find it at <https://github.com/cynic-net/dent/>.
 '''
 
 from    argparse import ArgumentParser, REMAINDER, RawDescriptionHelpFormatter
