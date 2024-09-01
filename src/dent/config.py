@@ -1,0 +1,56 @@
+''' Configuration for a ``dent`` run. This comes from command line arguments
+    and the user's environment, and includes information both on the
+    container being built/run and how we run ``dent`` (quiet mode, etc.).
+'''
+
+from    argparse  import Namespace
+from    os  import getuid
+from    pwd import getpwuid, struct_passwd
+
+class Config:
+
+    args        :Namespace
+    pwent       :struct_passwd
+
+    def __init__(self, args:Namespace):
+        self.args = args
+        self.pwent = getpwuid(getuid())
+
+    def qprint(self, *posargs, force_print=False, **kwargs):
+        ''' Call `print()` on arguments unless quiet flag is set.
+
+            `force_print` will print even if ARGS.quiet is set; this allows
+            the caller to test on a second condition without having to use
+            ``if`` and a duplicate call to `print()`.
+        '''
+        if force_print or not self.args.quiet:
+            print('-----', *posargs, **kwargs)
+
+    def progname(self):
+        from sys        import  argv
+        from os.path    import  basename
+        return basename(argv[0])
+
+    def image_alias(self):
+        ' "Alias" is name plus tag '
+        if self.args.image:
+            return self.args.image
+        else:
+            if not self.args.base_image:
+                #   It would be nice to display the name of the image we would
+                #   build here, but we can't because it wasn't specified and
+                #   we can't generate it from the base image name.
+                raise KeyError('Needed a base image but none specified')
+            if not self.args.tag:
+                self.args.tag = self.pwent.pw_name   # XXX mutation!
+            return '{}/{}:{}'.format(self.progname(),
+                self.args.base_image.replace(':', '.'), self.args.tag)
+
+    def exec_command(self):
+        ' The command we want to ``exec`` in the Docker container. '
+        #   `default=` does not work with nargs=REMAINDER. We cannot use
+        #   nargs='*' because that will cause options in the remainder to be
+        #   interpreted as dent options unless the user adds `--` between,
+        #   which is inconvenient.
+        return (self.args.COMMAND or ['bash', '-l'])
+
