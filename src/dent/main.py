@@ -17,7 +17,7 @@ from    textwrap import dedent
 import  json, os, shutil, stat, string, time
 
 #   We use some older typing stuff to maintain 3.8 compatibility.
-from    typing  import Dict, Tuple
+from    typing  import Dict, List, Tuple
 
 from    dent.config  import Config
 
@@ -228,7 +228,7 @@ def die(msg):
     print(PROGNAME + ':', msg, file=stderr)
     exit(1)
 
-def drcall(config, command, **kwargs):
+def drcall(config:Config, command, **kwargs) -> int:
     ''' Execute the `command` with `**kwargs` just as `subprocess.call()`
         would unless we're doing a dry run, in which case just print
         `command` to `stderr` and return success.
@@ -252,7 +252,7 @@ def drcall(config, command, **kwargs):
 #   Docker "API"
 
 DOCKER_COMMAND:Tuple[str,...] = ('docker',)
-def docker_setup():
+def docker_setup() -> None:
     ' Determine whether we use ``docker`` or ``sudo docker``. '
     global DOCKER_COMMAND
 
@@ -267,7 +267,7 @@ def docker_setup():
         die('Cannot run `docker` as this user and cannot sudo.')
     DOCKER_COMMAND = ('sudo',) + DOCKER_COMMAND
 
-def docker_inspect(config, thing, *container_names):
+def docker_inspect(config:Config, thing, *container_names):
     ''' Run ``docker `thing` inspect`` on the arguments.
 
         This parses the returned JSON and returns it as a Python list
@@ -298,7 +298,7 @@ def docker_inspect(config, thing, *container_names):
         output = failed.output     # Still need to get stdout
     return json.loads(output.decode('UTF-8'))
 
-def docker_container_start(config, *container_names):
+def docker_container_start(config:Config, *container_names) -> None:
     ''' Run `docker container start` on the arguments.
     '''
     config.qprint(f"Starting container '{config.args.CONTANER_NAME}'")
@@ -308,7 +308,6 @@ def docker_container_start(config, *container_names):
     retcode = drcall(config, command, stdout=DEVNULL)
     if retcode != 0:
         die("Couldn't start container")
-    return None
 
 ####################################################################
 #   Image configuration scripts and related files
@@ -316,7 +315,7 @@ def docker_container_start(config, *container_names):
 class PTemplate(string.Template):
     delimiter = '%'
 
-def dockerfile(config:Config):
+def dockerfile(config:Config) -> str:
     ' Return the text of `DOCKERFILE` with template substitution done. '
 
     #   The pre-setup command is run before /tmp/setup-*
@@ -330,7 +329,7 @@ def dockerfile(config:Config):
     }
     return PTemplate(DOCKERFILE).substitute(dfargs)
 
-def setup_pkg(config:Config):
+def setup_pkg(config:Config) -> str:
     ' Return the text of `SETUP_PKG` with template substitution done. '
     useradd = IMAGE_CONF.get('useradd') or 'generic'
     #   We avoid putting any user-related template arguments here so that
@@ -338,7 +337,7 @@ def setup_pkg(config:Config):
     #   this (fairly heavy) layer when user info changes.
     return PTemplate(SETUP_PKG).substitute({})
 
-def setup_user(config:Config):
+def setup_user(config:Config) -> str:
     ' Return the text of `SETUP_USER` with template substitution done. '
     useradd = IMAGE_CONF.get('useradd') or 'generic'
     template_args = {
@@ -354,7 +353,7 @@ def setup_user(config:Config):
 ####################################################################
 #   Image and container creation
 
-def build_image(config):
+def build_image(config:Config) -> None:
     perm_r   = stat.S_IRUSR
     perm_rx  = perm_r  | stat.S_IXUSR
     perm_rwx = perm_rx | stat.S_IWUSR
@@ -436,7 +435,7 @@ BASE_IMAGES = OrderedDict((
     ('fedora:38',       {}),
 ))
 
-def share_args(args, opt):
+def share_args(args, opt) -> List[str]:
     ''' Given an iterable of paths, return a list of ``-v`` options for
         ``docker run`` that will mount them at the same path in the
         container. Relative paths are taken as relative to ``$HOME`` and
@@ -448,7 +447,7 @@ def share_args(args, opt):
         vs += ['-v={}:{}:{}'.format(p, p, opt)]
     return vs
 
-def create_container(config):
+def create_container(config:Config) -> None:
     ''' Create a new container for persistent use.
 
         This is designed simply to exist, and may be stopped and restarted
@@ -486,7 +485,7 @@ def create_container(config):
         die('Failed to create container {} with command:\n{}' \
             .format(config.args.CONTANER_NAME, ' '.join(command)))
 
-def waitforstart(config, container_name):
+def waitforstart(config:Config, container_name) -> None:
     ''' Wait for a container to start, dieing if it exits immediately.
 
         The `Docker API`_ does not indicate whether it guarantees it won't
@@ -510,7 +509,7 @@ def waitforstart(config, container_name):
     if not tries > 0:
         die("Cannot start container '{}'".format(config.args.CONTANER_NAME))
 
-def enter_container(config:Config):
+def enter_container(config:Config) -> None:
     ' Enter the container, doing any dependent actions necessary. '
     docker_setup()
 

@@ -6,6 +6,7 @@
 from    argparse  import Namespace
 from    os  import getuid
 from    pwd import getpwuid, struct_passwd
+from    typing  import List
 
 class Config:
 
@@ -16,7 +17,7 @@ class Config:
         self.args = args
         self.pwent = getpwuid(getuid())
 
-    def qprint(self, *posargs, force_print=False, **kwargs):
+    def qprint(self, *posargs, force_print=False, **kwargs) -> None:
         ''' Call `print()` on arguments unless quiet flag is set.
 
             `force_print` will print even if ARGS.quiet is set; this allows
@@ -26,12 +27,12 @@ class Config:
         if force_print or not self.args.quiet:
             print('-----', *posargs, **kwargs)
 
-    def progname(self):
+    def progname(self) -> str:
         from sys        import  argv
         from os.path    import  basename
         return basename(argv[0])
 
-    def image_alias(self):
+    def image_alias(self) -> str:
         ' "Alias" is name plus tag '
         if self.args.image:
             return self.args.image
@@ -46,7 +47,7 @@ class Config:
             return '{}/{}:{}'.format(self.progname(),
                 self.args.base_image.replace(':', '.'), self.args.tag)
 
-    def exec_command(self):
+    def exec_command(self) -> List[str]:
         ' The command we want to ``exec`` in the Docker container. '
         #   `default=` does not work with nargs=REMAINDER. We cannot use
         #   nargs='*' because that will cause options in the remainder to be
