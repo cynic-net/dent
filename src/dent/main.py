@@ -24,7 +24,6 @@ from    dent.config  import Config
 #   We use the older high-level API so we work on Python <3.5.
 from    subprocess import call, check_output, DEVNULL, PIPE, CalledProcessError
 
-PROGNAME    = os.path.basename(argv[0])
 IMAGE_CONF  : Dict[str,str]
 
 #   To maximize build speed via use of cache when rebuilding, we want
@@ -224,10 +223,6 @@ dot_home
 ####################################################################
 #   Utility functions
 
-def die(msg):
-    print(PROGNAME + ':', msg, file=stderr)
-    exit(1)
-
 def drcall(config:Config, command, **kwargs) -> int:
     ''' Execute the `command` with `**kwargs` just as `subprocess.call()`
         would unless we're doing a dry run, in which case just print
@@ -252,7 +247,7 @@ def drcall(config:Config, command, **kwargs) -> int:
 #   Docker "API"
 
 DOCKER_COMMAND:Tuple[str,...] = ('docker',)
-def docker_setup() -> None:
+def docker_setup(config:Config) -> None:
     ' Determine whether we use ``docker`` or ``sudo docker``. '
     global DOCKER_COMMAND
 
@@ -264,7 +259,7 @@ def docker_setup() -> None:
     #   cached credentials.
     retcode = call(('sudo', '-v'))
     if retcode != 0:
-        die('Cannot run `docker` as this user and cannot sudo.')
+        config.die('Cannot run `docker` as this user and cannot sudo.')
     DOCKER_COMMAND = ('sudo',) + DOCKER_COMMAND
 
 def docker_inspect(config:Config, thing, *container_names):
@@ -307,7 +302,7 @@ def docker_container_start(config:Config, *container_names) -> None:
     #   of the containers it started.
     retcode = drcall(config, command, stdout=DEVNULL)
     if retcode != 0:
-        die("Couldn't start container")
+        config.die("Couldn't start container")
 
 ####################################################################
 #   Image configuration scripts and related files
@@ -394,7 +389,7 @@ def build_image(config:Config) -> None:
     command += ('--tag', config.image_alias(), tmpdir)
     retcode = drcall(config, command)
     if retcode != 0:
-        die("Error building image '{}' from '{}'"
+        config.die("Error building image '{}' from '{}'"
             .format(config.image_alias(), config.args.base_image))
 
     if not config.args.keep_tmpdir:
@@ -482,7 +477,7 @@ def create_container(config:Config) -> None:
         config.image_alias(), '/bin/sleep', str(2**31-1) )
     retcode = drcall(config, command, stdout=DEVNULL)   # stdout prints container ID
     if retcode != 0:
-        die('Failed to create container {} with command:\n{}' \
+        config.die('Failed to create container {} with command:\n{}' \
             .format(config.args.CONTANER_NAME, ' '.join(command)))
 
 def waitforstart(config:Config, container_name) -> None:
@@ -499,7 +494,7 @@ def waitforstart(config:Config, container_name) -> None:
     while tries > 0:
         containers = docker_inspect(config, 'container', config.args.CONTANER_NAME)
         if not containers:
-            die("Container '{}' was started but is no longer running" \
+            config.die("Container '{}' was started but is no longer running" \
                 .format(config.args.CONTANER_NAME))
         if containers[0]['State']['Running']:
             break
@@ -507,11 +502,11 @@ def waitforstart(config:Config, container_name) -> None:
             time.sleep(0.1)
             tries -= 1
     if not tries > 0:
-        die("Cannot start container '{}'".format(config.args.CONTANER_NAME))
+        config.die(f"Cannot start container '{config.args.CONTANER_NAME}'")
 
 def enter_container(config:Config) -> None:
     ' Enter the container, doing any dependent actions necessary. '
-    docker_setup()
+    docker_setup(config)
 
     #   Any arguments that modify the `docker run` command are not
     #   compatible with existing containers where `docker run` has
@@ -527,7 +522,7 @@ def enter_container(config:Config) -> None:
     if not containers:
         create_container(config)      # Also starts
     elif not_on_existing:
-        die(not_on_existing_msg)
+        config.die(not_on_existing_msg)
     elif not containers[0]['State']['Running']:
         docker_container_start(config, config.args.CONTANER_NAME)
 
@@ -636,4 +631,4 @@ def main():
     elif config.args.CONTANER_NAME:
         return enter_container(config)
     else:
-        die('Internal argument parsing error.')     # Should never happen.
+        config.die('Internal argument parsing error.')  # Should never happen.

@@ -6,6 +6,7 @@
 from    argparse  import Namespace
 from    os  import getuid
 from    pwd import getpwuid, struct_passwd
+from    sys import stderr
 from    typing  import List
 
 class Config:
@@ -17,6 +18,9 @@ class Config:
         self.args = args
         self.pwent = getpwuid(getuid())
 
+    ####################################################################
+    #   Program information and error reporting
+
     def qprint(self, *posargs, force_print=False, **kwargs) -> None:
         ''' Call `print()` on arguments unless quiet flag is set.
 
@@ -27,10 +31,17 @@ class Config:
         if force_print or not self.args.quiet:
             print('-----', *posargs, **kwargs)
 
+    def die(self, msg) -> None:
+        print(f'{self.progname()}: {msg}', file=stderr)
+        exit(1)
+
     def progname(self) -> str:
         from sys        import  argv
         from os.path    import  basename
         return basename(argv[0])
+
+    ####################################################################
+    #   Container configuration.
 
     def image_alias(self) -> str:
         ' "Alias" is name plus tag '
