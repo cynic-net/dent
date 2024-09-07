@@ -20,20 +20,25 @@ setup_docker() {
     fi
 }
 
+header() {
+    echo '┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+    [[ -z "$@" ]] || echo "┃   " "$@"
+}
+
 type_check() {
-    echo '≡≡≡≡≡ Type check'
+    echo '───── Type check'
     local args=()
     $verbose && args+=('-v')
     mypy "${args[@]}"   # default args in pyproject.toml.
 }
 
 unit_tests() {
-    echo '≡≡≡≡≡ Unit tests'
+    echo '───── Unit tests'
     pytest #"$@"        # default args in pyproject.toml.
 }
 
 dryrun_tests() {
-    echo '≡≡≡≡≡ Dry run tests'
+    echo '───── Dry run tests'
 
     local contname=$RANDOM$RANDOM-delete-me     # name that must not exist
 
@@ -71,6 +76,8 @@ nonbuild_tests() {
     #   (even simultaneous) test runs because the image never changes.
     etest_image=dent/test/nonbuild
     etest_container=dent-test-nonbuild.$$
+
+    header "Non-build tests"
 
     echo '≡≡≡≡≡ Setup'
     echo "Test image: $etest_image"
@@ -162,7 +169,7 @@ nonbuild_tests() {
 build_tests() {
     #   Unless arguments are passed in to test specific base images, all
     #   base images known to dent and viable on this platform are tested.
-    echo '≡≡≡≡≡ Builds from base images'
+    header 'Builds from base images'
 
     #   Certain very old images don't work on very new kernels.
     kern_release=$(uname -r)
@@ -186,7 +193,7 @@ build_tests() {
         tag=dent-test       # DEBUG
         image="dent/${baseimage/:/.}:$tag"  # duplicates code in dent
         container="dent-test-${baseimage/:/.}"
-        echo "===== $baseimage"
+        header "$baseimage"
         echo "    Image: $image"
         echo "Container: $container"
 
@@ -299,6 +306,7 @@ $small_clean && {
 #       rm -rf .build && ln -s $(pythonz locate 3.5.10) .python
 . ./pactivate -q
 setup_docker
+header
 $skip_typecheck || type_check
 unit_tests "$@"
 dryrun_tests
