@@ -1,5 +1,21 @@
-from    dent.main  import share_args
-from    pathlib  import Path
+from    argparse  import Namespace
+from    pathlib   import Path
+
+from    dent.config  import Config
+from    dent.main  import *
+
+def config(**kv) -> Config:
+    ns = Namespace(**kv)
+    print(ns)
+    return Config(ns)
+
+def test_dockerfile():
+    c = config(base_image = 'bim')
+    s = dockerfile(c)
+    print(s)
+    assert  'FROM bim\n' in s \
+       and  'RUN true\n' in s \
+       and f'USER {c.pwent.pw_name}\n' in s
 
 def test_share_args():
     home = str(Path.home())
