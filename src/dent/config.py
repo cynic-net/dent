@@ -7,7 +7,8 @@ from    argparse  import Namespace
 from    os  import getuid
 from    pwd import getpwuid, struct_passwd
 from    sys import stderr
-from    typing  import List
+from    typing  import List, Tuple
+from    subprocess import call, DEVNULL
 
 class Config:
 
@@ -39,6 +40,26 @@ class Config:
         from sys        import  argv
         from os.path    import  basename
         return basename(argv[0])
+
+    ####################################################################
+    #   External command configuration and execution
+
+    docker_command:Tuple[str,...]
+
+    def docker_setup(self) -> None:
+        ' Determine whether we use ``docker`` or ``sudo docker``. '
+
+        self.docker_command = ('docker',)
+        retcode = call(
+            self.docker_command + ('info',), stdout=DEVNULL, stderr=DEVNULL)
+        if retcode == 0:  return
+
+        #   Before we do any further work, ensure user can sudo and has
+        #   cached credentials.
+        retcode = call(('sudo', '-v'))
+        if retcode != 0:
+            self.die('Cannot run `docker` as this user and cannot sudo.')
+        self.docker_command = ('sudo',) + self.docker_command
 
     ####################################################################
     #   Container configuration.

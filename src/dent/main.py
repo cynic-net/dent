@@ -17,12 +17,12 @@ from    textwrap import dedent
 import  json, os, shutil, stat, string, time
 
 #   We use some older typing stuff to maintain 3.8 compatibility.
-from    typing  import Dict, List, Tuple
+from    typing  import Dict, List
 
 from    dent.config  import Config
 
 #   We use the older high-level API so we work on Python <3.5.
-from    subprocess import call, check_output, DEVNULL, PIPE, CalledProcessError
+from    subprocess import call, check_output, DEVNULL, CalledProcessError
 
 IMAGE_CONF  : Dict[str,str]
 
@@ -246,22 +246,6 @@ def drcall(config:Config, command, **kwargs) -> int:
 ####################################################################
 #   Docker "API"
 
-DOCKER_COMMAND:Tuple[str,...] = ('docker',)
-def docker_setup(config:Config) -> None:
-    ' Determine whether we use ``docker`` or ``sudo docker``. '
-    global DOCKER_COMMAND
-
-    retcode = call(DOCKER_COMMAND + ('info',), stdout=DEVNULL, stderr=DEVNULL)
-    if retcode == 0:
-        return
-
-    #   Before we do any further work, ensure user can sudo and has
-    #   cached credentials.
-    retcode = call(('sudo', '-v'))
-    if retcode != 0:
-        config.die('Cannot run `docker` as this user and cannot sudo.')
-    DOCKER_COMMAND = ('sudo',) + DOCKER_COMMAND
-
 def docker_inspect(config:Config, thing, *container_names):
     ''' Run ``docker `thing` inspect`` on the arguments.
 
@@ -283,7 +267,7 @@ def docker_inspect(config:Config, thing, *container_names):
         would be executed.
     '''
     try:
-        command = DOCKER_COMMAND + (thing, 'inspect') + container_names
+        command = config.docker_command + (thing, 'inspect') + container_names
         #   Unfortunately, this produces `Error: No such ...` on stderr
         #   when the image or container doesn't exist. We suppress stdout
         #   to avoid this printing to the terminal, though this may make
@@ -297,7 +281,7 @@ def docker_container_start(config:Config, *container_names) -> None:
     ''' Run `docker container start` on the arguments.
     '''
     config.qprint(f"Starting container '{config.args.CONTANER_NAME}'")
-    command = DOCKER_COMMAND + ('container', 'start') + container_names
+    command = config.docker_command + ('container', 'start') + container_names
     #   Suppress stdout because `docker` prints the names
     #   of the containers it started.
     retcode = drcall(config, command, stdout=DEVNULL)
@@ -376,10 +360,11 @@ def build_image(config:Config) -> None:
     if config.args.force_rebuild:
         config.qprint("Removing image '{}' and forcing full rebuild" \
             .format(config.image_alias()))
-        drcall(config, DOCKER_COMMAND + ('rmi', '-f', config.image_alias()))
+        drcall(config,
+            config.docker_command + ('rmi', '-f', config.image_alias()))
 
     config.qprint("Building image '{}'".format(config.image_alias()))
-    command = DOCKER_COMMAND + ('build',)
+    command = config.docker_command + ('build',)
     if config.args.progress:
         command += ('--progress=plain',)
     if config.args.quiet:
@@ -468,7 +453,7 @@ def create_container(config:Config) -> None:
     user = config.pwent.pw_name
     config.qprint("Creating new container '{}' from image '{}' for user {}" \
         .format(config.args.CONTANER_NAME, config.image_alias(), user))
-    command = DOCKER_COMMAND + ('run',
+    command = config.docker_command + ('run',
         '--name='+config.args.CONTANER_NAME, '--hostname='+config.args.CONTANER_NAME,
         '--env=HOST_HOSTNAME='+node(),
         '--env=LOGNAME='+user, '--env=USER='+user,
@@ -506,7 +491,7 @@ def waitforstart(config:Config, container_name) -> None:
 
 def enter_container(config:Config) -> None:
     ' Enter the container, doing any dependent actions necessary. '
-    docker_setup(config)
+    config.docker_setup()
 
     #   Any arguments that modify the `docker run` command are not
     #   compatible with existing containers where `docker run` has
@@ -534,7 +519,7 @@ def enter_container(config:Config) -> None:
     #   the existing code in the `docker` command to do this. We can also
     #   do a "process tail call optimization" here since all we would do is
     #   return the exit code anyway.
-    command = list(DOCKER_COMMAND) + ['exec']
+    command = list(config.docker_command) + ['exec']
     command.append('-i')
     command.append('--detach-keys=ctrl-@,ctrl-d')
     if stdin.isatty():
