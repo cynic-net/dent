@@ -1,0 +1,14 @@
+from    argparse  import Namespace
+from    dent.config  import Config
+
+def config(**kv) -> Config:
+    ns = Namespace(**kv)
+    print(ns)
+    return Config(ns)
+
+def test_image_conf():
+    c = config(base_image = None)
+    assert None is c.image_conf('useradd')
+
+    c = config(base_image = 'alpine:3.20')
+    assert 'alpine' == c.image_conf('useradd')

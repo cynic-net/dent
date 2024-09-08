@@ -4,11 +4,51 @@
 '''
 
 from    argparse  import Namespace
+from    collections import OrderedDict
 from    os  import getuid
 from    pwd import getpwuid, struct_passwd
-from    sys import stderr
-from    typing  import List, Tuple
 from    subprocess import call, DEVNULL
+from    sys import stderr
+from    typing  import List, Optional, Tuple
+
+####################################################################
+#   These are the images we know we can build, because we've tested them.
+#   Commented out entries we either used to be able to build but no longer
+#   can (usually because they are old and the package servers are no longer
+#   available) or have a comment explaining that we need to fix something.
+
+BASE_IMAGES = OrderedDict((
+    #   XXX Since we run the setup script that installs packages with bash,
+    #   we use presetup on alpine:* to add bash _before_ we try to run the
+    #   setup script. But this is annoying because we need to specify it
+    #   by hand; probably we should fix this to allow matching alpine:*,
+    #   while having our tested images list include :3.19 etc. (We don't
+    #   want it including alpine:* or even alpine:latest below, because
+    #   that's not tested any more once they release a new version.
+    ('alpine:3.19',     { 'presetup': 'apk add bash', 'useradd': 'alpine' }),
+    ('alpine:3.20',     { 'presetup': 'apk add bash', 'useradd': 'alpine' }),
+    ('alpine:latest',   { 'presetup': 'apk add bash', 'useradd': 'alpine' }),
+#   ('debian:8',        {}),
+#   ('debian:9',        {}),
+    ('debian:10',       {}),
+    ('debian:11',       {}),
+    ('debian:12',       {}),
+#   ('ubuntu:14.04',    {}),
+    ('ubuntu:16.04',    {}),
+    ('ubuntu:18.04',    {}),
+    ('ubuntu:20.04',    {}),
+    ('ubuntu:22.04',    {}),
+#   ('centos:6',        {}),    # But not with kernel ≥ 4.19 (works on 4.4).
+#   ('centos:7',        {}),    # Package repos are gone.
+#   ('centos:8',        {}),    # Package repos are gone.
+    ('rockylinux:8',    {}),
+#   ('rockylinux:9',    {}),    # FIXME: --allowerasing would do the trick,
+                                # but that's not in CentOS 7.
+    ('fedora:30',       {}),
+    ('fedora:38',       {}),
+))
+
+####################################################################
 
 class Config:
 
@@ -18,6 +58,13 @@ class Config:
     def __init__(self, args:Namespace):
         self.args = args
         self.pwent = getpwuid(getuid())
+
+    ####################################################################
+    #   Internal configuration information
+
+    def image_conf(self, key:str) -> Optional[str]:
+        conf = BASE_IMAGES.get(self.args.base_image) or {}
+        return conf.get(key)
 
     ####################################################################
     #   Program information and error reporting

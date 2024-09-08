@@ -6,7 +6,6 @@
 
 from    argparse  import (
         ArgumentParser, REMAINDER, RawDescriptionHelpFormatter, Namespace)
-from    collections import OrderedDict
 from    importlib.metadata  import version
 from    os.path import basename, join as pjoin
 from    pathlib import Path
@@ -17,14 +16,12 @@ from    textwrap import dedent
 import  json, os, shutil, stat, string, time
 
 #   We use some older typing stuff to maintain 3.8 compatibility.
-from    typing  import Dict, List
+from    typing  import List
 
-from    dent.config  import Config
+from    dent.config  import Config, BASE_IMAGES
 
 #   We use the older high-level API so we work on Python <3.5.
 from    subprocess import call, check_output, DEVNULL, CalledProcessError
-
-IMAGE_CONF  : Dict[str,str]
 
 #   To maximize build speed via use of cache when rebuilding, we want
 #   start with the layers that are largest and least likely to change
@@ -300,7 +297,7 @@ def dockerfile(config:Config) -> str:
     #   The pre-setup command is run before /tmp/setup-*
     #   This defaults to 'true' (a no-op), but can be set in the BASE_IMAGES
     #   config dict to e.g. install Bash so we can run the setup scripts.
-    presetup_command = IMAGE_CONF.get('presetup') or 'true'
+    presetup_command = config.image_conf('presetup') or 'true'
     dfargs = {
         'base_image':       config.args.base_image,
         'presetup_command': presetup_command,
@@ -310,7 +307,7 @@ def dockerfile(config:Config) -> str:
 
 def setup_pkg(config:Config) -> str:
     ' Return the text of `SETUP_PKG` with template substitution done. '
-    useradd = IMAGE_CONF.get('useradd') or 'generic'
+    useradd = config.image_conf('useradd') or 'generic'
     #   We avoid putting any user-related template arguments here so that
     #   this won't change based on user, thus letting us avoid regenerating
     #   this (fairly heavy) layer when user info changes.
@@ -318,7 +315,7 @@ def setup_pkg(config:Config) -> str:
 
 def setup_user(config:Config) -> str:
     ' Return the text of `SETUP_USER` with template substitution done. '
-    useradd = IMAGE_CONF.get('useradd') or 'generic'
+    useradd = config.image_conf('useradd') or 'generic'
     template_args = {
         'sudo':             '%sudo',    # Avoid having to escape
         'wheel':            '%wheel',   #    /etc/sudoers groups
@@ -379,41 +376,6 @@ def build_image(config:Config) -> None:
 
     if not config.args.keep_tmpdir:
         shutil.rmtree(tmpdir)
-
-#   These are the images we know we can build, because we've tested them.
-#   Commented out entries we either used to be able to build but no longer
-#   can (usually because they are old and the package servers are no longer
-#   available) or have a comment explaining that we need to fix something.
-BASE_IMAGES = OrderedDict((
-    #   XXX Since we run the setup script that installs packages with bash,
-    #   we use presetup on alpine:* to add bash _before_ we try to run the
-    #   setup script. But this is annoying because we need to specify it
-    #   by hand; probably we should fix this to allow matching alpine:*,
-    #   while having our tested images list include :3.19 etc. (We don't
-    #   want it including alpine:* or even alpine:latest below, because
-    #   that's not tested any more once they release a new version.
-    ('alpine:3.19',     { 'presetup': 'apk add bash', 'useradd': 'alpine' }),
-    ('alpine:3.20',     { 'presetup': 'apk add bash', 'useradd': 'alpine' }),
-    ('alpine:latest',   { 'presetup': 'apk add bash', 'useradd': 'alpine' }),
-#   ('debian:8',        {}),
-#   ('debian:9',        {}),
-    ('debian:10',       {}),
-    ('debian:11',       {}),
-    ('debian:12',       {}),
-#   ('ubuntu:14.04',    {}),
-    ('ubuntu:16.04',    {}),
-    ('ubuntu:18.04',    {}),
-    ('ubuntu:20.04',    {}),
-    ('ubuntu:22.04',    {}),
-#   ('centos:6',        {}),    # But not with kernel ≥ 4.19 (works on 4.4).
-#   ('centos:7',        {}),    # Package repos are gone.
-#   ('centos:8',        {}),    # Package repos are gone.
-    ('rockylinux:8',    {}),
-#   ('rockylinux:9',    {}),    # FIXME: --allowerasing would do the trick,
-                                # but that's not in CentOS 7.
-    ('fedora:30',       {}),
-    ('fedora:38',       {}),
-))
 
 def share_args(args, opt) -> List[str]:
     ''' Given an iterable of paths, return a list of ``-v`` options for
@@ -601,10 +563,6 @@ def main():
         help='command to run in container (default: bash -l)')
 
     config = Config(p.parse_args())
-
-    #   If we know the given base image name, get any special configuration
-    #   for it. Otherwise we use a generic config.
-    global IMAGE_CONF; IMAGE_CONF = BASE_IMAGES.get(config.args.base_image) or {}
 
     if config.args.list_base_images:
         for i in BASE_IMAGES.keys(): print(i)
