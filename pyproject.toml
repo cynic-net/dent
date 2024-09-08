@@ -32,6 +32,11 @@ build-backend = 'setuptools.build_meta'
 #   a later version of Python. (You do not need to have the specified version
 #   of Python available.) This should match project.requires-python above.
 python_version = 3.8
+#   mypy normally loads non-*.py files as a module named __main__, causing
+#   a collsion if there's more than one of them. The following option changes
+#   mypy to name the module after the filename (including extension), which
+#   allows checking multiple *.pt files in one run.
+scripts_are_modules = true
 #   We must also have src/*/__init__.py files because mypy doesn't really
 #   understand namespace packages.
 files       = [ 'src', 'src/**/*.pt' ]
