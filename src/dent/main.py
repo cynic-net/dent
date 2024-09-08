@@ -7,6 +7,7 @@
 from    argparse  import (
         ArgumentParser, REMAINDER, RawDescriptionHelpFormatter, Namespace)
 from    importlib.metadata  import version
+from    importlib.resources  import files as resfiles
 from    os.path import basename, join as pjoin
 from    pathlib import Path
 from    platform import node
@@ -15,207 +16,15 @@ from    tempfile import mkdtemp
 from    textwrap import dedent
 import  json, os, shutil, stat, string, time
 
-#   We use some older typing stuff to maintain 3.8 compatibility.
+#   We were using some older typing stuff to maintain 3.8 compatibility.
+#   This is no longer reqired now that we're at 3.9, and should be removed.
 from    typing  import List
 
 from    dent.config  import Config, BASE_IMAGES
+import  dent.tmpl
 
 #   We use the older high-level API so we work on Python <3.5.
 from    subprocess import call, check_output, DEVNULL, CalledProcessError
-
-#   To maximize build speed via use of cache when rebuilding, we want
-#   start with the layers that are largest and least likely to change
-#   and work down towards the smaller/faster/more-likley-to-change
-#   ones.
-#
-#   One thing to keep in mind is that the result produced by
-#   `setup-pkg` is out of date as soon as the distro releases more
-#   package updates, but `docker build` doesn't know this. So even
-#   when building a new container instead of using an existing one you
-#   should still update its packages.
-#
-DOCKERFILE = '''\
-FROM %{base_image}
-
-RUN %{presetup_command}
-COPY setup-pkg /tmp/
-RUN ["/bin/bash", "/tmp/setup-pkg"]
-COPY setup-user /tmp/
-RUN ["/bin/bash", "/tmp/setup-user"]
-
-#   USER and WORKDIR are used by both `docker run` and `start`.
-#   We don't care about CMD because we always specify a command
-#   for `run` and it's ignored by `start`.
-USER %{uname}
-WORKDIR /home/%{uname}
-'''
-
-SETUP_HEADER = '''\
-#!/usr/bin/env bash
-set -e -o pipefail
-
-die() {
-    local exitcode="$1"; shift
-    echo 1>&2 "$(basename "$0")" "$@"
-    exit $exitcode
-}
-'''
-
-SETUP_PKG = SETUP_HEADER + '''
-UNIVERSAL_PKGS='sudo file curl wget git vim man-db'
-
-packages() {
-    echo '-- Package updates/installs'
-    export LC_ALL=C
-    if type apt 2>/dev/null; then
-        packages_apt
-        ( cd /etc \
-            && sed -i -e '/en_US/s/^# //' -e '/ja_JP/s/^# //' /etc/locale.gen \
-            && etckeeper commit -m 'Enable UTF-8 and other locales' \
-            && locale-gen \
-        )
-    elif type yum 2>/dev/null; then
-        packages_rpm
-    elif type apk 2>/dev/null; then
-        packages_apk
-    else
-        die 30 "Cannot find known package manager."
-    fi
-}
-
-packages_apt() {
-    export DEBIAN_FRONTEND=noninteractive
-    #   If we fail to download some updates, e.g. due to no network
-    #   connection or updates no longer being available for old systems,
-    #   we'll live with that.
-    apt-get update || true
-    #   We must install git and set user.name/email before installing
-    #   etckeeper or etckeeper will be unable to commit.
-    apt-get -y install git
-    git config --global user.name 'dent root user'
-    git config --global user.email 'root@dent.nonexistent'
-    #   Install etckeeper as early as posible so we have a record of
-    #   the following installs.
-    cat >> /etc/.gitignore << _____ # The Docker host owns these files
-/hosts
-/resolv.conf
-_____
-    apt-get -y install etckeeper
-    #   ≤14.04 always configures bzr, even if git is installed instead
-    sed -i -e '/^VCS=/s/.*/VCS="git"/' /etc/etckeeper/etckeeper.conf
-    etckeeper init
-    #   It's not worth the time to run dist-upgrade now so as to have
-    #   the latest packages in the image because the image will be out
-    #   of date in a week or two anyway and the user will still have
-    #   to run dist-upgrade himself on new containers.
-    #apt-get -y dist-upgrade
-    #   Ubuntu images appear to turn off installation of manpages and
-    #   other useful stuff.
-    [ -f "/etc/dpkg/dpkg.cfg.d/excludes" ] && {
-        cd /etc
-        git rm -f /etc/dpkg/dpkg.cfg.d/excludes
-        etckeeper commit -m 'Re-enable installs of manpages, etc.'
-    }
-    #   We install a minimal set of packages here because
-    #   the user will use `distro` to install what he needs.
-    apt-get -y install $UNIVERSAL_PKGS \
-        locales manpages apt-file procps xz-utils
-    apt-get clean
-}
-
-packages_rpm() {
-    #   etckeeper not available in standard CentOS packages at least up to 7
-
-    #   Ensure that man pages are installed with packages if that was disabled.
-    sed -i -e '/tsflags=nodocs/s/^/#/' /etc/yum.conf /etc/dnf/dnf.conf || true
-    yum -y update
-    yum -y install $UNIVERSAL_PKGS man-pages
-}
-
-packages_apk() {
-    #   XXX This should set up etckeeper.
-    apk update
-    apk add $UNIVERSAL_PKGS man-pages man-pages-posix
-}
-
-packages
-'''
-
-SETUP_USER = SETUP_HEADER + '''
-users_generic() {
-    echo '-- User creation'
-
-    #   Note we do not add the user to the `sudo` group as that will
-    #   introduce a PASSWD: entry even though it's overridden by the
-    #   NOPASSWD: below, and that PASSWD entry will make `sudo -v`
-    #   require a password.
-    local -a groups=() allgroups=(wheel sudo systemd-journal)
-    for group in ${allgroups[@]}; do
-        grep -q "^$group:" /etc/group && groups+=("$group")
-    done
-    groups=$(IFS=, ; echo "${groups[*]}")
-
-    useradd --shell /bin/bash \
-        --create-home --home-dir /home/%{uname}  \
-        --user-group --groups "$groups" \
-        --uid %{uid} -c '%{ugecos}' %{uname}
-
-    #   Since we have no password, we must let the user sudo without one.
-    mkdir -p /etc/sudoers.d/    # In case we skipped sudo install
-    cat << _____ > /etc/sudoers.d/50-%{uname}
-#   We change verifypw from its default of `all` to `any` for the user so
-#   that if NOPASSWD: is lacking on any entries in /etc/sudoers (as it is
-#   for, e.g., %sudo group on Debian) the user can still `sudo -v` without
-#   a password.
-Defaults:%{uname} verifypw = any
-
-#   We add explicit sudo for the user of this container for those systems
-#   where adding the user to the wheel or sudo group doesn't do that.
-%{uname} ALL=(ALL:ALL) NOPASSWD:ALL
-_____
-    chmod 0750 /etc/sudoers.d/[0-9]*
-}
-
-users_alpine() {
-    echo '-- User creation (alpine)'
-
-    #   Alpine `adduser` has no option to set the group, but unlike this
-    #   command on some other systems, it automatically puts the user in
-    #   her own group with the same name and id.
-    #addgroup --gid %{uid} %{uname}
-
-    #   -D avoids assigning a password
-    adduser -D --uid %{uid} -g '%{ugecos}' \
-        --shell /bin/bash --home /home/%{uname}   %{uname}
-
-    #   XXX Should `adduser %{uname} $group` for any groups?
-
-    #   Since we have no password, we must let the user sudo without one.
-    mkdir -p /etc/sudoers.d/    # In case we skipped sudo install
-    echo '%{uname} ALL=(ALL:ALL) NOPASSWD:ALL' > /etc/sudoers.d/50-%{uname}
-}
-
-dot_home() {
-    echo '-- dot-home install'
-    local url_prefix=https://raw.githubusercontent.com/dot-home/dot-home
-    local url_branch=main
-    local url="$url_prefix/$url_branch/bootstrap-user"
-    export LOGNAME=%{uname} HOME=~%{uname}
-    export DH_BOOTSTRAP_USERS="$url_prefix/$url_branch/dh/bootstrap-users"
-
-    rm -f $HOME/.profile $HOME/.bash_profile $HOME/.bashrc
-
-    if curl -sfL "$url" | sudo -E -u $LOGNAME bash; then
-        echo "dot-home installed for user $LOGNAME"
-    else
-        echo "WARNING: dot-home install failure"
-        sleep 3
-    fi
-}
-
-users_%{useradd}
-dot_home
-'''
 
 ####################################################################
 #   Utility functions
@@ -291,9 +100,13 @@ def docker_container_start(config:Config, *container_names) -> None:
 class PTemplate(string.Template):
     delimiter = '%'
 
-def dockerfile(config:Config) -> str:
-    ' Return the text of `DOCKERFILE` with template substitution done. '
+def template(name:str) -> str:
+    file = resfiles(dent.tmpl) / name
+    with file.open("rt") as fd:     # type: ignore [call-overload]
+        return fd.read()            # ↑ unclear what the type problem is
 
+def dockerfile(config:Config) -> str:
+    ' Return the text of `tmpl/Dockerfile` with template substitution done. '
     #   The pre-setup command is run before /tmp/setup-*
     #   This defaults to 'true' (a no-op), but can be set in the BASE_IMAGES
     #   config dict to e.g. install Bash so we can run the setup scripts.
@@ -303,18 +116,23 @@ def dockerfile(config:Config) -> str:
         'presetup_command': presetup_command,
         'uname':            config.pwent.pw_name,
     }
-    return PTemplate(DOCKERFILE).substitute(dfargs)
+    return PTemplate(template('Dockerfile')).substitute(dfargs)
 
 def setup_pkg(config:Config) -> str:
-    ' Return the text of `SETUP_PKG` with template substitution done. '
-    useradd = config.image_conf('useradd') or 'generic'
+    ''' Return the text of `tmpl/setup_package.bash` with standard
+        Bash script header added and template substitution done.
+    '''
     #   We avoid putting any user-related template arguments here so that
     #   this won't change based on user, thus letting us avoid regenerating
     #   this (fairly heavy) layer when user info changes.
-    return PTemplate(SETUP_PKG).substitute({})
+    return PTemplate(
+            template('setup_head.bash') + template('setup_packages.bash')) \
+        .substitute({})
 
 def setup_user(config:Config) -> str:
-    ' Return the text of `SETUP_USER` with template substitution done. '
+    ''' Return the text of `tmpl/setup_user.bash` with standard
+        Bash script header added and template substitution done.
+    '''
     useradd = config.image_conf('useradd') or 'generic'
     template_args = {
         'sudo':             '%sudo',    # Avoid having to escape
@@ -324,7 +142,9 @@ def setup_user(config:Config) -> str:
         'ugecos':           config.pwent.pw_gecos,
         'useradd':          useradd,
     }
-    return PTemplate(SETUP_USER).substitute(template_args)
+    return PTemplate(
+            template('setup_head.bash') + template('setup_user.bash')
+        ).substitute(template_args)
 
 ####################################################################
 #   Image and container creation

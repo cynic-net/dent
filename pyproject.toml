@@ -1,5 +1,5 @@
 [project]
-version = '1.0.1.dev2'
+version = '1.0.1.dev3'
 name = 'dent'
 description = 'Enter interactive shells in Docker containers and manage persistent containers'
 authors = [
@@ -11,7 +11,7 @@ urls.homepage = 'https://github.com/cynic-net/dent'
 urls.source = 'https://github.com/cynic-net/dent'
 urls.tracker = 'https://github.com/cynic-net/dent/issues'
 
-requires-python = '>=3.8'
+requires-python = '>=3.9'
 dependencies = []
 
 ####################################################################
@@ -31,7 +31,7 @@ build-backend = 'setuptools.build_meta'
 #   This locks all typing syntax to the specified version, even if you're using
 #   a later version of Python. (You do not need to have the specified version
 #   of Python available.) This should match project.requires-python above.
-python_version = 3.8
+python_version = 3.9
 #   mypy normally loads non-*.py files as a module named __main__, causing
 #   a collsion if there's more than one of them. The following option changes
 #   mypy to name the module after the filename (including extension), which

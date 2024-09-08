@@ -6,16 +6,27 @@ from    dent.main  import *
 
 def config(**kv) -> Config:
     ns = Namespace(**kv)
-    print(ns)
+    print(f'using {ns}')
     return Config(ns)
 
 def test_dockerfile():
-    c = config(base_image = 'bim')
+    c = config(base_image = 'test_dockerfile')
     s = dockerfile(c)
-    print(s)
-    assert  'FROM bim\n' in s \
+    assert  'FROM test_dockerfile\n' in s \
        and  'RUN true\n' in s \
        and f'USER {c.pwent.pw_name}\n' in s
+
+def test_setup_pkg():
+    s = setup_pkg(config())
+    assert '#!/usr/bin/env bash' in s \
+       and 'packages()' in s
+
+def test_setup_user():
+    s = setup_user(config(base_image = 'test_setup_user'))
+    assert '#!/usr/bin/env bash' in s \
+       and 'users_generic' in s
+    #   XXX We should test case where config.image_conf('useradd') is not None.
+
 
 def test_share_args():
     home = str(Path.home())
