@@ -161,6 +161,14 @@ users_generic() {
     done
     groups=$(IFS=, ; echo "${groups[*]}")
 
+    #   Some systems such as Ubuntu 24.04, have a default user, usually
+    #   with uid 1000, and if the host user's uid is the same, a conflict
+    #   arises when creating the new user. So delete that user if it
+    #   exists. (We use deluser instead of userdel because it looks like
+    #   it does a better job of removing all the related files.)
+    deluser --remove-all-files $(id -n -u %{uid}) \
+        </dev/null >/dev/null 2>&1 || true          # ignore any errors
+
     useradd --shell /bin/bash \
         --create-home --home-dir /home/%{uname}  \
         --user-group --groups "$groups" \
