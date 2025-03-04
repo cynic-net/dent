@@ -421,7 +421,7 @@ def image_alias():
             #   It would be nice to display the name of the image we would
             #   build here, but we can't because it wasn't specified and
             #   we can't generate it from the base image name.
-            die('Needed a base image but none specified')
+            die('No such container; supply -B base-image to build.')
         if not ARGS.tag:
             ARGS.tag = PWENT.pw_name
         return '{}/{}:{}'.format(
