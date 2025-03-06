@@ -617,7 +617,7 @@ def main():
              " (only if container doesn't exist)")
     p.add_argument('-r', '--run-opt', action='append', default=[],
         help="command-line option for 'docker run'; may be specifed multiple"
-            " times. Use '-r -e=FOO=bar' syntax!")
+            " times. Use '-r=-e=FOO=bar' syntax!")
     p.add_argument('-s', '--share-ro', action='append', default=[],
         help='Read-only bind mount the given directories to the same paths'
             ' inside the container. Relative paths are relative to $HOME.')
