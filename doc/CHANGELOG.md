@@ -23,12 +23,14 @@ will be tagged, but specific releases can also be fetched via the Git
 commit ID.
 
 ### dev
-- Significant internal re-organisation; should not be visible to users.
-- Test: Now use -B NAME to specify images; all args after -- passed to pytest
-- Test: Now use mypy.
+
+### 1.0.2 (2025-04-30)
 - Fixed: User with UID 1000 is now removed before trying to add the dent user.
   (Many users of dent had the same UID, and collided with images such as
   Ubuntu that already include a user with UID 1000.)
+- Test: Now use -B NAME to specify images; all args after -- passed to pytest
+- Test: Now use mypy.
+- Significant internal re-organisation; should not be visible to users.
 
 ### 1.0.0 (2024-08-29)
 - Initial release as Python distribution package.
