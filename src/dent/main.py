@@ -149,8 +149,16 @@ packages
 
 SETUP_USER = SETUP_HEADER + '''
 users_generic() {
-    echo '-- User creation'
+    echo '-- Ensure UID 1000 does not exist'
+    #   Ubuntu images (and perhaps others) have a pre-created user with
+    #   UID 1000; if the dent user is also using Ubuntu with a default
+    #   install, she will be UID 1000 as well and dent will not be able
+    #   to create that user in the container because it already exists.
+    #   So make sure it doesn't.
+    uname1000=$(id -un 1000) || true
+    [[ -n $uname1000 ]] && userdel --force --remove "$uname1000"
 
+    echo '-- User creation'
     #   Note we do not add the user to the `sudo` group as that will
     #   introduce a PASSWD: entry even though it's overridden by the
     #   NOPASSWD: below, and that PASSWD entry will make `sudo -v`
