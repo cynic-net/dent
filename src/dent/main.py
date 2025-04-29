@@ -169,7 +169,7 @@ users_generic() {
     #   Since we have no password, we must let the user sudo without one.
     mkdir -p /etc/sudoers.d/    # In case we skipped sudo install
     cat << _____ > /etc/sudoers.d/50-%{uname}
-#   We change verifypw from its default of `all` to `any` for the user so
+#   We change verifypw from its default of 'all' to 'any' for the user so
 #   that if NOPASSWD: is lacking on any entries in /etc/sudoers (as it is
 #   for, e.g., %sudo group on Debian) the user can still `sudo -v` without
 #   a password.
