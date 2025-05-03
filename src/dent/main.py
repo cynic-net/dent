@@ -20,7 +20,7 @@ import  json, os, shutil, stat, string, time
 from    importlib_resources  import files as resfiles
 
 #   We use some older typing stuff to maintain 3.8 compatibility.
-from    typing  import Dict, Tuple
+from    typing  import List, Dict, Tuple, Union
 
 
 #   We use the older high-level API so we work on Python <3.5.
@@ -401,20 +401,20 @@ def enter_container():
 ####################################################################
 #   Main
 
-def main():
+#   Things we can print with -P and their functions producing the text.
+PRINT_FILE_ARGS =  {
+    'dockerfile':   dockerfile,
+    'setup-pkg':    setup_pkg,
+    'setup-user':   setup_user,
+}
+
+def parseargs(argv:Union[List[str],None]=None) -> Namespace:
     p = ArgumentParser(formatter_class=RawDescriptionHelpFormatter,
         description=dedent('''
             Start a new process in a Docker container, creating the container
             and image if necessary. For detailed documentation, see:
                 https://github.com/cynic-net/dent
         '''))
-
-    #   Things we can print with -P and their functions producing the text.
-    PRINT_FILE_ARGS =  {
-        'dockerfile':   dockerfile,
-        'setup-pkg':    setup_pkg,
-        'setup-user':   setup_user,
-    }
 
     #   General options
     p.add_argument('--keep-tmpdir', action='store_true',
@@ -463,24 +463,34 @@ def main():
     p.add_argument('COMMAND', nargs=REMAINDER, default='SEE BELOW',
         help='command to run in container (default: bash -l)')
 
-    global ARGS; ARGS = p.parse_args()
+    args = p.parse_args(argv)
 
     #   `default=` does not work with nargs=REMAINDER. We cannot use
     #   nargs='*' because that will cause options in the remainder to be
     #   interpreted as dent options unless the user adds `--` between,
     #   which is inconvenient.
-    if not ARGS.COMMAND: ARGS.COMMAND = ['bash', '-l']
+    if not args.COMMAND: args.COMMAND = ['bash', '-l']
+
+    #   We handle these simple options that don't actually run any real
+    #   code here mainly because version needs access to the
+    #   ArgumentParser, and we'd prefer to keep that local.
+    if args.version:
+        print(f'{p.prog} version {version(p.prog)}')
+        exit(0)
+    elif args.list_base_images:
+        for i in BASE_IMAGES.keys(): print(i)
+        exit(0)
+
+    return args
+
+def main():
+    global ARGS; ARGS = parseargs()
 
     #   If we know the given base image name, get any special configuration
     #   for it. Otherwise we use a generic config.
     global IMAGE_CONF; IMAGE_CONF = BASE_IMAGES.get(ARGS.base_image) or {}
 
-    if ARGS.list_base_images:
-        for i in BASE_IMAGES.keys(): print(i)
-    elif ARGS.version:
-        print(f'{p.prog} version {version(p.prog)}')
-
-    elif ARGS.print_file and ARGS.CONTANER_NAME:
+    if ARGS.print_file and ARGS.CONTANER_NAME:
         print(PRINT_FILE_ARGS[ARGS.print_file]())
     elif ARGS.CONTANER_NAME:
         return enter_container()

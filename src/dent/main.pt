@@ -1,5 +1,6 @@
-from    dent.main  import share_args
+from    dent.main  import share_args, parseargs
 from    pathlib  import Path
+import  pytest
 
 def test_share_args():
     home = str(Path.home())
@@ -8,3 +9,32 @@ def test_share_args():
                 '-v=/home/bar/baz:/home/bar/baz:rw',
                f'-v={home}/quux:{home}/quux:rw',
            ] == ps
+
+def test_parseargs_bad():
+    cname = 'my-container-name'
+    def bad_args():  return pytest.raises(SystemExit)
+
+    #   Command line options that must not have a container name.
+    with bad_args():  parseargs(['--version', cname])
+    with bad_args():  parseargs(['--list-base-images', cname])
+    with bad_args():  parseargs(['--version', '-L'])
+
+    #   XXX This argparse mutual exclusion is going to go away because
+    #   we're moving towards using a config file, and Argparse won't be
+    #   parsing that so we'll need separate code to handle things like
+    #   this.
+    with bad_args(): parseargs(['-t', 'bimg-tag', '-i', 'contimage', cname])
+    #   Could check stderr here, but not worth it as this is going away
+
+def test_parseargs_version(capsys):
+    with pytest.raises(SystemExit) as ex: parseargs(['--version'])
+    out, err = capsys.readouterr()
+    assert (ex.value.code, '')  == (0, err)     # no errors
+    assert out.startswith('pytest version ')
+
+def test_parseargs_list_base_images(capsys):
+    with pytest.raises(SystemExit) as ex: parseargs(['-L'])
+    out, err = capsys.readouterr()
+    assert (ex.value.code, '')  == (0, err)     # no errors
+    assert 'ubuntu' in out
+    assert 'debian' in out
