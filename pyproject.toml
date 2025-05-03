@@ -1,5 +1,5 @@
 [project]
-version = '1.0.2'
+version = '1.0.3.dev0'
 name = 'dent'
 description = 'Enter interactive shells in Docker containers and manage persistent containers'
 authors = [
@@ -12,7 +12,7 @@ urls.source = 'https://github.com/cynic-net/dent'
 urls.tracker = 'https://github.com/cynic-net/dent/issues'
 
 requires-python = '>=3.8'
-dependencies = []
+dependencies = ['importlib_resources']
 
 ####################################################################
 
@@ -22,7 +22,10 @@ dent            = 'dent.main:main'
 #   see that file for important information on this.
 
 [build-system]
-requires = ['setuptools']
+#   • setuptools-scm includes all files tracked by Git in the sdist, so
+#     that our data files under src/ are also included in the binary
+#     package. These are loaded using `importlib_resources`.
+requires = ['setuptools', 'setuptools-scm']
 build-backend = 'setuptools.build_meta'
 
 ####################################################################
