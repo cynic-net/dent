@@ -26,7 +26,6 @@ from    typing  import List, Dict, Tuple, Union
 
 PROGNAME    = os.path.basename(argv[0])
 PWENT       = getpwuid(os.getuid())
-ARGS        : Namespace
 IMAGE_CONF  : Dict[str,str]
 
 ####################################################################
@@ -78,7 +77,7 @@ SETUP_USER      = SETUP_HEADER + resource_text('setup-user')
 class PTemplate(string.Template):
     delimiter = '%'
 
-def dockerfile():
+def dockerfile(config:Namespace):
     ' Return the text of `DOCKERFILE` with template substitution done. '
 
     #   The pre-setup command is run before /tmp/setup-*
@@ -86,13 +85,13 @@ def dockerfile():
     #   config dict to e.g. install Bash so we can run the setup scripts.
     presetup_command = IMAGE_CONF.get('presetup') or 'true'
     dfargs = {
-        'base_image':       ARGS.base_image,
+        'base_image':       config.base_image,
         'presetup_command': presetup_command,
         'uname':            PWENT.pw_name,
     }
     return PTemplate(DOCKERFILE).substitute(dfargs)
 
-def setup_pkg():
+def setup_pkg(config):
     ' Return the text of `SETUP_PKG` with template substitution done. '
     useradd = IMAGE_CONF.get('useradd') or 'generic'
     #   We avoid putting any user-related template arguments here so that
@@ -100,7 +99,7 @@ def setup_pkg():
     #   this (fairly heavy) layer when user info changes.
     return PTemplate(SETUP_PKG).substitute({})
 
-def setup_user():
+def setup_user(config:Namespace):
     ' Return the text of `SETUP_USER` with template substitution done. '
     useradd = IMAGE_CONF.get('useradd') or 'generic'
     template_args = {
@@ -117,16 +116,16 @@ def setup_user():
 #   Main and argument handling.
 
 def main():
-    global ARGS; ARGS = parseargs()
+    config = parseargs()
 
     #   If we know the given base image name, get any special configuration
     #   for it. Otherwise we use a generic config.
-    global IMAGE_CONF; IMAGE_CONF = BASE_IMAGES.get(ARGS.base_image) or {}
+    global IMAGE_CONF; IMAGE_CONF = BASE_IMAGES.get(config.base_image) or {}
 
-    if ARGS.print_file and ARGS.CONTANER_NAME:
-        print(PRINT_FILE_ARGS[ARGS.print_file]())
-    elif ARGS.CONTANER_NAME:
-        return enter_container()
+    if config.print_file and config.CONTANER_NAME:
+        print(PRINT_FILE_ARGS[config.print_file](config))
+    elif config.CONTANER_NAME:
+        return enter_container(config)
     else:
         die('Internal argument parsing error.')     # Should never happen.
 
@@ -192,52 +191,52 @@ def parseargs(argv:Union[List[str],None]=None) -> Namespace:
     p.add_argument('COMMAND', nargs=REMAINDER, default='SEE BELOW',
         help='command to run in container (default: bash -l)')
 
-    args = p.parse_args(argv)
+    config = p.parse_args(argv)
 
     #   `default=` does not work with nargs=REMAINDER. We cannot use
     #   nargs='*' because that will cause options in the remainder to be
     #   interpreted as dent options unless the user adds `--` between,
     #   which is inconvenient.
-    if not args.COMMAND: args.COMMAND = ['bash', '-l']
+    if not config.COMMAND: config.COMMAND = ['bash', '-l']
 
     #   We handle these simple options that don't actually run any real
     #   code here mainly because version needs access to the
     #   ArgumentParser, and we'd prefer to keep that local.
-    if args.version:
+    if config.version:
         print(f'{p.prog} version {version(p.prog)}')
         exit(0)
-    elif args.list_base_images:
+    elif config.list_base_images:
         for i in BASE_IMAGES.keys(): print(i)
         exit(0)
 
-    return args
+    return config
 
 ####################################################################
 #   Container entry.
 
-def enter_container():
+def enter_container(config:Namespace):
     ' Enter the container, doing any dependent actions necessary. '
     docker_setup()
 
     #   Any arguments that modify the `docker run` command are not
     #   compatible with existing containers where `docker run` has
     #   already been executed.
-    not_on_existing = (ARGS.base_image is not None)                     \
-        or (len(ARGS.run_opt) > 0)                                      \
-        or (len(ARGS.share_ro) > 0)                                     \
-        or (len(ARGS.share_rw) > 0)
+    not_on_existing = (config.base_image is not None)                   \
+        or (len(config.run_opt) > 0)                                    \
+        or (len(config.share_ro) > 0)                                   \
+        or (len(config.share_rw) > 0)
     not_on_existing_msg =                                               \
          '-B, -r and -s options cannot affect existing containers'
 
-    containers = docker_inspect('container', ARGS.CONTANER_NAME)
+    containers = docker_inspect('container', config.CONTANER_NAME)
     if not containers:
-        create_container()      # Also starts
+        create_container(config)      # Also starts
     elif not_on_existing:
         die(not_on_existing_msg)
     elif not containers[0]['State']['Running']:
-        docker_container_start(ARGS.CONTANER_NAME)
+        docker_container_start(config)
 
-    waitforstart(ARGS.CONTANER_NAME)
+    waitforstart(config)
 
     #   Rather than using `container.exec_run() and then rewriting the same
     #   code to deal with the copying of stdin/out/err between what the
@@ -250,18 +249,18 @@ def enter_container():
     command.append('--detach-keys=ctrl-@,ctrl-d')
     if stdin.isatty():
         command.append('-t')
-    command.append(ARGS.CONTANER_NAME)
-    command += ARGS.COMMAND
+    command.append(config.CONTANER_NAME)
+    command += config.COMMAND
     stdout.flush(); stderr.flush()  # Ensure all our output is complete
                                     # before this process is replaced.
-    if not ARGS.dry_run:
+    if not config.dry_run:
         os.execvp(command[0], command)
         #   Never returns
     else:
         print(' '.join(command), file=stderr)
         exit(0)
 
-def waitforstart(container_name):
+def waitforstart(config:Namespace):
     ''' Wait for a container to start, dieing if it exits immediately.
 
         The `Docker API`_ does not indicate whether it guarantees it won't
@@ -270,25 +269,25 @@ def waitforstart(container_name):
 
         .. Docker API: https://docs.docker.com/engine/api/v1.30/#operation/ContainerStart
     '''
-    if ARGS.dry_run: return
+    if config.dry_run: return
     tries = 50
     while tries > 0:
-        containers = docker_inspect('container', ARGS.CONTANER_NAME)
+        containers = docker_inspect('container', config.CONTANER_NAME)
         if not containers:
             die("Container '{}' was started but is no longer running" \
-                .format(ARGS.CONTANER_NAME))
+                .format(config.CONTANER_NAME))
         if containers[0]['State']['Running']:
             break
         else:
             time.sleep(0.1)
             tries -= 1
     if not tries > 0:
-        die("Cannot start container '{}'".format(ARGS.CONTANER_NAME))
+        die("Cannot start container '{}'".format(config.CONTANER_NAME))
 
 ####################################################################
 #   Container setup.
 
-def create_container():
+def create_container(config:Namespace):
     ''' Create a new container for persistent use.
 
         This is designed simply to exist, and may be stopped and restarted
@@ -299,32 +298,32 @@ def create_container():
         commands or shells with ``docker exec`` in that existing container.
     '''
     shared_path_opts \
-        = share_args(ARGS.share_ro, 'ro') + share_args(ARGS.share_rw, 'rw')
+        = share_args(config.share_ro, 'ro') + share_args(config.share_rw, 'rw')
 
-    images = docker_inspect('image', image_alias())
-    if ARGS.force_rebuild:
-        build_image()
-    elif images or ARGS.image:
+    images = docker_inspect('image', image_alias(config))
+    if config.force_rebuild:
+        build_image(config)
+    elif images or config.image:
         #   If we found an image, use it. If we were explicitly requested
         #   to use a particular image, make sure we do not try to build it
         #   locally but let `docker run` try to download it.
-        qprint("Using existing image '{}'".format(image_alias()))
+        qprint(config, "Using existing image '{}'".format(image_alias(config)))
     else:
-        build_image()
+        build_image(config)
     user = PWENT.pw_name
-    qprint("Creating new container '{}' from image '{}' for user {}" \
-        .format(ARGS.CONTANER_NAME, image_alias(), user))
+    qprint(config, "Creating new container '{}' from image '{}' for user {}" \
+        .format(config.CONTANER_NAME, image_alias(config), user))
     command = DOCKER_COMMAND + ('run',
-        '--name='+ARGS.CONTANER_NAME, '--hostname='+ARGS.CONTANER_NAME,
+        '--name='+config.CONTANER_NAME, '--hostname='+config.CONTANER_NAME,
         '--env=HOST_HOSTNAME='+node(),
         '--env=LOGNAME='+user, '--env=USER='+user,
         '--rm=false', '--detach=true', '--tty=false',
-        *shared_path_opts, *ARGS.run_opt,
-        image_alias(), '/bin/sleep', str(2**31-1) )
-    retcode = drcall(command, stdout=DEVNULL)   # stdout prints container ID
+        *shared_path_opts, *config.run_opt,
+        image_alias(config), '/bin/sleep', str(2**31-1) )
+    retcode = drcall(config, command, stdout=DEVNULL)   # stdout prints container ID
     if retcode != 0:
         die('Failed to create container {} with command:\n{}' \
-            .format(ARGS.CONTANER_NAME, ' '.join(command)))
+            .format(config.CONTANER_NAME, ' '.join(command)))
 
 def share_args(args, opt):
     ''' Given an iterable of paths, return a list of ``-v`` options for
@@ -338,68 +337,68 @@ def share_args(args, opt):
         vs += ['-v={}:{}:{}'.format(p, p, opt)]
     return vs
 
-def image_alias():
+def image_alias(config:Namespace):
     ' "Alias" is name plus tag '
-    if ARGS.image:
-        return ARGS.image
+    if config.image:
+        return config.image
     else:
-        if not ARGS.base_image:
+        if not config.base_image:
             #   It would be nice to display the name of the image we would
             #   build here, but we can't because it wasn't specified and
             #   we can't generate it from the base image name.
             die('No such container; supply -B base-image to build.')
-        if not ARGS.tag:
-            ARGS.tag = PWENT.pw_name
+        if not config.tag:
+            config.tag = PWENT.pw_name
         return '{}/{}:{}'.format(
-            PROGNAME, ARGS.base_image.replace(':', '.'), ARGS.tag)
+            PROGNAME, config.base_image.replace(':', '.'), config.tag)
 
 ####################################################################
 #   Container image build
 
-def build_image():
+def build_image(config:Namespace):
     perm_r   = stat.S_IRUSR
     perm_rx  = perm_r  | stat.S_IXUSR
     perm_rwx = perm_rx | stat.S_IWUSR
-    if not ARGS.tmpdir:
-        ARGS.tmpdir = tmpdir = mkdtemp(prefix=PROGNAME+'-build-')
+    if not config.tmpdir:
+        config.tmpdir = tmpdir = mkdtemp(prefix=PROGNAME+'-build-')
     else:
-        tmpdir = ARGS.tmpdir
+        tmpdir = config.tmpdir
         os.mkdir(tmpdir, perm_rwx)  # We want to die if it already exists
-    qprint('Setting up context for image build in {}'.format(tmpdir),
-        force_print=ARGS.keep_tmpdir)
+    qprint(config, 'Setting up context for image build in {}'.format(tmpdir),
+        force_print=config.keep_tmpdir)
 
     with open(pjoin(tmpdir, 'Dockerfile'), 'w', encoding='UTF-8') as f:
         os.fchmod(f.fileno(), perm_r)
-        print(dockerfile(), file=f)
+        print(dockerfile(config), file=f)
 
     with open(pjoin(tmpdir, 'setup-pkg'), 'w', encoding='UTF-8') as f:
         os.fchmod(f.fileno(), perm_rx)
-        print(setup_pkg(), file=f)
+        print(setup_pkg(config), file=f)
 
     with open(pjoin(tmpdir, 'setup-user'), 'w', encoding='UTF-8') as f:
         os.fchmod(f.fileno(), perm_rx)
-        print(setup_user(), file=f)
+        print(setup_user(config), file=f)
 
-    if ARGS.force_rebuild:
-        qprint("Removing image '{}' and forcing full rebuild" \
-            .format(image_alias()))
-        drcall(DOCKER_COMMAND + ('rmi', '-f', image_alias()))
+    if config.force_rebuild:
+        qprint(config, "Removing image '{}' and forcing full rebuild" \
+            .format(image_alias(config)))
+        drcall(config, DOCKER_COMMAND + ('rmi', '-f', image_alias(config)))
 
-    qprint("Building image '{}'".format(image_alias()))
+    qprint(config, "Building image '{}'".format(image_alias(config)))
     command = DOCKER_COMMAND + ('build',)
-    if ARGS.progress:
+    if config.progress:
         command += ('--progress=plain',)
-    if ARGS.quiet:
+    if config.quiet:
         command += ('--quiet',)
-    if ARGS.force_rebuild:
+    if config.force_rebuild:
         command += ('--no-cache',)
-    command += ('--tag', image_alias(), tmpdir)
-    retcode = drcall(command)
+    command += ('--tag', image_alias(config), tmpdir)
+    retcode = drcall(config, command)
     if retcode != 0:
         die("Error building image '{}' from '{}'"
-            .format(image_alias(), ARGS.base_image))
+            .format(image_alias(config), config.base_image))
 
-    if not ARGS.keep_tmpdir:
+    if not config.keep_tmpdir:
         shutil.rmtree(tmpdir)
 
 ####################################################################
@@ -452,14 +451,14 @@ def docker_inspect(thing, *container_names):
         output = failed.output     # Still need to get stdout
     return json.loads(output.decode('UTF-8'))
 
-def docker_container_start(*container_names):
+def docker_container_start(config:Namespace):
     ''' Run `docker container start` on the arguments.
     '''
-    qprint("Starting container '{}'".format(ARGS.CONTANER_NAME))
-    command = DOCKER_COMMAND + ('container', 'start') + container_names
+    qprint(config, "Starting container '{}'".format(config.CONTANER_NAME))
+    command = DOCKER_COMMAND + ('container', 'start', config.CONTANER_NAME)
     #   Suppress stdout because `docker` prints the names
     #   of the containers it started.
-    retcode = drcall(command, stdout=DEVNULL)
+    retcode = drcall(config, command, stdout=DEVNULL)
     if retcode != 0:
         die("Couldn't start container")
     return None
@@ -467,21 +466,21 @@ def docker_container_start(*container_names):
 ####################################################################
 #   Utility functions
 
-def qprint(*args, force_print=False, **kwargs):
+def qprint(config:Namespace, *args, force_print=False, **kwargs):
     ''' Call `print()` on arguments unless quiet flag is set.
 
-        `force_print` will print even if ARGS.quiet is set; this allows the
+        `force_print` will print even if args.quiet is set; this allows the
         caller to test on a second condition without having to use ``if``
         and a duplicate call to `print()`.
     '''
-    if force_print or not ARGS.quiet:
+    if force_print or not config.quiet:
         print('-----', *args, **kwargs)
 
 def die(msg):
     print(PROGNAME + ':', msg, file=stderr)
     exit(1)
 
-def drcall(command, **kwargs):
+def drcall(config, command, **kwargs):
     ''' Execute the `command` with `**kwargs` just as `subprocess.call()`
         would unless we're doing a dry run, in which case just print
         `command` to `stderr` and return success.
@@ -491,7 +490,7 @@ def drcall(command, **kwargs):
         the commands. (When all is well, nothing other than the commands
         should appear on stderr.)
     '''
-    if not ARGS.dry_run:
+    if not config.dry_run:
         return call(command, **kwargs)
     else:
         #   Ensure we're not coming out before stuff that's been buffered
