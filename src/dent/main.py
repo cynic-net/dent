@@ -122,9 +122,9 @@ def main():
     #   for it. Otherwise we use a generic config.
     global IMAGE_CONF; IMAGE_CONF = BASE_IMAGES.get(config.base_image) or {}
 
-    if config.print_file and config.CONTANER_NAME:
+    if config.print_file and config.CONTAINER_NAME:
         print(PRINT_FILE_ARGS[config.print_file](config))
-    elif config.CONTANER_NAME:
+    elif config.CONTAINER_NAME:
         return enter_container(config)
     else:
         die('Internal argument parsing error.')     # Should never happen.
@@ -180,7 +180,7 @@ def parseargs(argv:Union[List[str],None]=None) -> Namespace:
     #   We must have either a container name or one of the options that
     #   requests information.
     pe = p.add_mutually_exclusive_group(required=True)
-    pe.add_argument('CONTANER_NAME', nargs='?',
+    pe.add_argument('CONTAINER_NAME', nargs='?',
         help='container name or ID (required)')
     pe.add_argument('-L', '--list-base-images', action='store_true',
         help='list base images this script knows how to configure')
@@ -228,7 +228,7 @@ def enter_container(config:Namespace):
     not_on_existing_msg =                                               \
          '-B, -r and -s options cannot affect existing containers'
 
-    containers = docker_inspect('container', config.CONTANER_NAME)
+    containers = docker_inspect('container', config.CONTAINER_NAME)
     if not containers:
         create_container(config)      # Also starts
     elif not_on_existing:
@@ -249,7 +249,7 @@ def enter_container(config:Namespace):
     command.append('--detach-keys=ctrl-@,ctrl-d')
     if stdin.isatty():
         command.append('-t')
-    command.append(config.CONTANER_NAME)
+    command.append(config.CONTAINER_NAME)
     command += config.COMMAND
     stdout.flush(); stderr.flush()  # Ensure all our output is complete
                                     # before this process is replaced.
@@ -272,17 +272,17 @@ def waitforstart(config:Namespace):
     if config.dry_run: return
     tries = 50
     while tries > 0:
-        containers = docker_inspect('container', config.CONTANER_NAME)
+        containers = docker_inspect('container', config.CONTAINER_NAME)
         if not containers:
             die("Container '{}' was started but is no longer running" \
-                .format(config.CONTANER_NAME))
+                .format(config.CONTAINER_NAME))
         if containers[0]['State']['Running']:
             break
         else:
             time.sleep(0.1)
             tries -= 1
     if not tries > 0:
-        die("Cannot start container '{}'".format(config.CONTANER_NAME))
+        die("Cannot start container '{}'".format(config.CONTAINER_NAME))
 
 ####################################################################
 #   Container setup.
@@ -312,9 +312,9 @@ def create_container(config:Namespace):
         build_image(config)
     user = PWENT.pw_name
     qprint(config, "Creating new container '{}' from image '{}' for user {}" \
-        .format(config.CONTANER_NAME, image_alias(config), user))
+        .format(config.CONTAINER_NAME, image_alias(config), user))
     command = DOCKER_COMMAND + ('run',
-        '--name='+config.CONTANER_NAME, '--hostname='+config.CONTANER_NAME,
+        '--name='+config.CONTAINER_NAME, '--hostname='+config.CONTAINER_NAME,
         '--env=HOST_HOSTNAME='+node(),
         '--env=LOGNAME='+user, '--env=USER='+user,
         '--rm=false', '--detach=true', '--tty=false',
@@ -323,7 +323,7 @@ def create_container(config:Namespace):
     retcode = drcall(config, command, stdout=DEVNULL)   # stdout prints container ID
     if retcode != 0:
         die('Failed to create container {} with command:\n{}' \
-            .format(config.CONTANER_NAME, ' '.join(command)))
+            .format(config.CONTAINER_NAME, ' '.join(command)))
 
 def share_args(args, opt):
     ''' Given an iterable of paths, return a list of ``-v`` options for
@@ -454,8 +454,8 @@ def docker_inspect(thing, *container_names):
 def docker_container_start(config:Namespace):
     ''' Run `docker container start` on the arguments.
     '''
-    qprint(config, "Starting container '{}'".format(config.CONTANER_NAME))
-    command = DOCKER_COMMAND + ('container', 'start', config.CONTANER_NAME)
+    qprint(config, "Starting container '{}'".format(config.CONTAINER_NAME))
+    command = DOCKER_COMMAND + ('container', 'start', config.CONTAINER_NAME)
     #   Suppress stdout because `docker` prints the names
     #   of the containers it started.
     retcode = drcall(config, command, stdout=DEVNULL)
