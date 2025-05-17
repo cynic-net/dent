@@ -22,7 +22,7 @@ import  json, os, shutil, stat, string, time
 from    importlib_resources  import files as resfiles
 
 #   We use some older typing stuff to maintain 3.8 compatibility.
-from    typing  import List, Dict, Tuple, Union
+from    typing  import Any, Dict, List, Optional, Tuple, Union
 
 PROGNAME    = os.path.basename(argv[0])
 PWENT       = getpwuid(os.getuid())
@@ -228,12 +228,12 @@ def enter_container(config:Namespace):
     not_on_existing_msg =                                               \
          '-B, -r and -s options cannot affect existing containers'
 
-    containers = docker_inspect('container', config.CONTAINER_NAME)
-    if not containers:
+    container = docker_inspect('container', config.CONTAINER_NAME)
+    if container is None:
         create_container(config)      # Also starts
     elif not_on_existing:
         die(not_on_existing_msg)
-    elif not containers[0]['State']['Running']:
+    elif not container['State']['Running']:
         docker_container_start(config)
 
     waitforstart(config)
@@ -272,11 +272,11 @@ def waitforstart(config:Namespace):
     if config.dry_run: return
     tries = 50
     while tries > 0:
-        containers = docker_inspect('container', config.CONTAINER_NAME)
-        if not containers:
+        container = docker_inspect('container', config.CONTAINER_NAME)
+        if container is None:
             die("Container '{}' was started but is no longer running" \
                 .format(config.CONTAINER_NAME))
-        if containers[0]['State']['Running']:
+        elif container['State']['Running']:
             break
         else:
             time.sleep(0.1)
@@ -420,20 +420,19 @@ def docker_setup():
         die('Cannot run `docker` as this user and cannot sudo.')
     DOCKER_COMMAND = ('sudo',) + DOCKER_COMMAND
 
-def docker_inspect(thing, *container_names):
-    ''' Run ``docker `thing` inspect`` on the arguments.
+def docker_inspect(object:str, name:str) -> Optional[Dict[Any, Any]]:
+    ''' Run ``docker `object` inspect `name```, where `object` is usually
+        ``image`` or ``container``.
 
-        This parses the returned JSON and returns it as a Python list
-        of dictionaries containing the information about each
-        container it finds.
+        This parses the returned JSON into a Python dictionary, or
+        `None` if `object` doesn't exist.
 
-        ``inspect`` will always produce at least an empty JSON array
+        ``docker inspect`` will always produce at least an empty JSON array
         to stdout, regardless of error status, and since we've already
-        confirmed we can run ``docker`` and talk to the daemon any
-        other errors are highly unlikely. Therefore we simply ignore
-        any return code (letting the error of the list being empty
-        appear later) and let stderr pass through to the user to help
-        debug any problems.
+        confirmed we can run ``docker`` and talk to the daemon any other
+        errors are highly unlikely. Therefore we simply ignore any return
+        code (letting the error of the list being empty appear later) and
+        let stderr pass through to the user to help debug any problems.
 
         This is not affected by ``--dry-run`` because this only queries
         existing configuration and state, and in many cases result of those
@@ -441,7 +440,7 @@ def docker_inspect(thing, *container_names):
         would be executed.
     '''
     try:
-        command = DOCKER_COMMAND + (thing, 'inspect') + container_names
+        command = DOCKER_COMMAND + (object, 'inspect', name)
         #   Unfortunately, this produces `Error: No such ...` on stderr
         #   when the image or container doesn't exist. We suppress stdout
         #   to avoid this printing to the terminal, though this may make
@@ -449,7 +448,9 @@ def docker_inspect(thing, *container_names):
         output = check_output(command, stderr=DEVNULL)
     except CalledProcessError as failed:
         output = failed.output     # Still need to get stdout
-    return json.loads(output.decode('UTF-8'))
+    l = json.loads(output.decode('UTF-8'))
+    if len(l) == 0: return None
+    else:           return l[0]
 
 def docker_container_start(config:Namespace):
     ''' Run `docker container start` on the arguments.
