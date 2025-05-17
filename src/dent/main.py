@@ -297,29 +297,42 @@ def create_container(config:Namespace):
         avoid overflowing any old 32-bit systems) and run our actual
         commands or shells with ``docker exec`` in that existing container.
     '''
+    if config.image:
+        config.image_alias = config.image
+    else:
+        if not config.base_image:
+            #   It would be nice to display the name of the image we would
+            #   build here, but we can't because it wasn't specified and
+            #   we can't generate it from the base image name.
+            die('No such container; supply -B base-image to build.')
+        if not config.tag:
+            config.tag = PWENT.pw_name
+        config.image_alias = '{}/{}:{}'.format(
+            PROGNAME, config.base_image.replace(':', '.'), config.tag)
+
     shared_path_opts \
         = share_args(config.share_ro, 'ro') + share_args(config.share_rw, 'rw')
 
-    images = docker_inspect('image', image_alias(config))
+    images = docker_inspect('image', config.image_alias)
     if config.force_rebuild:
         build_image(config)
     elif images or config.image:
         #   If we found an image, use it. If we were explicitly requested
         #   to use a particular image, make sure we do not try to build it
         #   locally but let `docker run` try to download it.
-        qprint(config, "Using existing image '{}'".format(image_alias(config)))
+        qprint(config, "Using existing image '{}'".format(config.image_alias))
     else:
         build_image(config)
     user = PWENT.pw_name
     qprint(config, "Creating new container '{}' from image '{}' for user {}" \
-        .format(config.CONTAINER_NAME, image_alias(config), user))
+        .format(config.CONTAINER_NAME, config.image_alias, user))
     command = DOCKER_COMMAND + ('run',
         '--name='+config.CONTAINER_NAME, '--hostname='+config.CONTAINER_NAME,
         '--env=HOST_HOSTNAME='+node(),
         '--env=LOGNAME='+user, '--env=USER='+user,
         '--rm=false', '--detach=true', '--tty=false',
         *shared_path_opts, *config.run_opt,
-        image_alias(config), '/bin/sleep', str(2**31-1) )
+        config.image_alias, '/bin/sleep', str(2**31-1) )
     retcode = drcall(config, command, stdout=DEVNULL)   # stdout prints container ID
     if retcode != 0:
         die('Failed to create container {} with command:\n{}' \
@@ -339,18 +352,7 @@ def share_args(args, opt):
 
 def image_alias(config:Namespace):
     ' "Alias" is name plus tag '
-    if config.image:
-        return config.image
-    else:
-        if not config.base_image:
-            #   It would be nice to display the name of the image we would
-            #   build here, but we can't because it wasn't specified and
-            #   we can't generate it from the base image name.
-            die('No such container; supply -B base-image to build.')
-        if not config.tag:
-            config.tag = PWENT.pw_name
-        return '{}/{}:{}'.format(
-            PROGNAME, config.base_image.replace(':', '.'), config.tag)
+    return config.image_alias
 
 ####################################################################
 #   Container image build
@@ -381,10 +383,10 @@ def build_image(config:Namespace):
 
     if config.force_rebuild:
         qprint(config, "Removing image '{}' and forcing full rebuild" \
-            .format(image_alias(config)))
-        drcall(config, DOCKER_COMMAND + ('rmi', '-f', image_alias(config)))
+            .format(config.image_alias))
+        drcall(config, DOCKER_COMMAND + ('rmi', '-f', config.image_alias))
 
-    qprint(config, "Building image '{}'".format(image_alias(config)))
+    qprint(config, "Building image '{}'".format(config.image_alias))
     command = DOCKER_COMMAND + ('build',)
     if config.progress:
         command += ('--progress=plain',)
@@ -392,11 +394,11 @@ def build_image(config:Namespace):
         command += ('--quiet',)
     if config.force_rebuild:
         command += ('--no-cache',)
-    command += ('--tag', image_alias(config), tmpdir)
+    command += ('--tag', config.image_alias, tmpdir)
     retcode = drcall(config, command)
     if retcode != 0:
         die("Error building image '{}' from '{}'"
-            .format(image_alias(config), config.base_image))
+            .format(config.image_alias, config.base_image))
 
     if not config.keep_tmpdir:
         shutil.rmtree(tmpdir)
