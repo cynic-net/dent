@@ -2,4 +2,7 @@
 #   Runtime requirements are in pyproject.toml.
 -e ./
 mypy
+#   pytest 8.4 requires Python 3.9. We stick with our 3.8 requirement since
+#   we don't need the newer pytest features.
+pytest < 8.4
 pytest-pt
