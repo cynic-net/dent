@@ -23,6 +23,9 @@ will be tagged, but specific releases can also be fetched via the Git
 commit ID.
 
 ### dev
+- Added: `ubuntu:26.04` to supported releases.
+- Fixed: User should not be in `wheel`/`sudo` groups (complex details
+  documented in `dent/setup-user`).
 - Fixed: `debian:10` builds now work again; EOL Debian releases (???10) are
   redirected to `archive.debian.org` automatically. (Debian 8 and 9 have
   additional issues that require further fixes.)

@@ -11,11 +11,14 @@ users_generic() {
     [[ -n $uname1000 ]] && userdel --force --remove "$uname1000"
 
     echo '-- User creation'
-    #   Note we do not add the user to the `sudo` group as that will
-    #   introduce a PASSWD: entry even though it's overridden by the
-    #   NOPASSWD: below, and that PASSWD entry will make `sudo -v`
-    #   require a password.
-    local -a groups=() allgroups=(wheel sudo systemd-journal)
+    #   IMPORTANT: we do *not* add the user to the `wheel` or `sudo` group.
+    #   The user has explicit NOPASSWD: access via /etc/sudoers.d/50-%{uname}
+    #   below, and additional group perms usually add PASSWD: which breaks
+    #   `sudo -v`. There are ways of working around this (see below), but
+    #   they're not reliable. We should only add the user to any of these
+    #   groups on systems where something breaks seriously enough we can afford
+    #   to have `sudo -v` break.
+    local -a groups=() allgroups=(systemd-journal)
     for group in ${allgroups[@]}; do
         grep -q "^$group:" /etc/group && groups+=("$group")
     done
@@ -29,15 +32,17 @@ users_generic() {
     #   Since we have no password, we must let the user sudo without one.
     mkdir -p /etc/sudoers.d/    # In case we skipped sudo install
     cat << _____ > /etc/sudoers.d/50-%{uname}
-#   We change verifypw from its default of 'all' to 'any' for the user so
-#   that if NOPASSWD: is lacking on any entries in /etc/sudoers (as it is
-#   for, e.g., %sudo group on Debian) the user can still `sudo -v` without
-#   a password.
-Defaults:%{uname} verifypw = any
-
-#   We add explicit sudo for the user of this container for those systems
-#   where adding the user to the wheel or sudo group doesn't do that.
+#   We add explicit sudo for the user of this container because we do not, for
+#   reasons explained above and below, try to use group membership for this.
 %{uname} ALL=(ALL:ALL) NOPASSWD:ALL
+
+#   Changing verifypw from its default of 'all' to 'any' for the user will in
+#   original sudo ensure that if that if NOPASSWD: is lacking on any entries in
+#   /etc/sudoers (as it is for, e.g., %sudo group on Debian) the user can still
+#   `sudo -v` without a password. But this does not work with e.g. sudo-rs
+#   (the new Rust `sudo` shipped with Ubuntu 26.04), so we leave this here
+#   just as a safety net that can't really be relied upon.
+Defaults:%{uname} verifypw = any
 _____
     chmod 0750 /etc/sudoers.d/[0-9]*
 }

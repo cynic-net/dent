@@ -58,6 +58,7 @@ BASE_IMAGES = OrderedDict((
     ('ubuntu:20.04',    {}),
     ('ubuntu:22.04',    {}),
     ('ubuntu:24.04',    {}),
+    ('ubuntu:26.04',    {}),
 #   ('centos:6',        {}),    # But not with kernel ≥ 4.19 (works on 4.4).
 #   ('centos:7',        {}),    # Package repos are gone.
 #   ('centos:8',        {}),    # Package repos are gone.
