@@ -23,6 +23,8 @@ will be tagged, but specific releases can also be fetched via the Git
 commit ID.
 
 ### dev
+- Test: Typecheck and unit tests now run even without Docker available.
+  Docker issues are warned early but only fail when Docker is actually used.
 
 ### 1.0.2 (2025-04-30)
 - Fixed: User with UID 1000 is now removed before trying to add the dent user.

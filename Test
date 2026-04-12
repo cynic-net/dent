@@ -10,13 +10,21 @@ adderror() {
     errorlist+=("$*");
 }
 
+docker_unavailable() {
+    die 'Cannot run $docker due to setup_docker() failure (see above).'
+}
+
 setup_docker() {
     declare -g docker=docker
-    if ! $docker --version; then
-        die "Cannot run '$docker' command. Check path?"
+    if ! $docker --version >/dev/null 2>&1; then
+        echo 1>&2 "WARNING: Cannot run '$docker' command. Check path?"
+        docker=docker_unavailable
     elif ! $docker info >/dev/null 2>&1; then
         docker='sudo docker'
-        sudo -v || die "Cannot sudo to run '$docker'; start proxy?"
+        if ! sudo -v 2>/dev/null; then
+            echo 1>&2 "WARNING: Cannot sudo to run '$docker'; start proxy?"
+            docker=docker_unavailable
+        fi
     fi
 }
 
@@ -41,6 +49,8 @@ dryrun_tests() {
     echo '───── Dry run tests'
 
     local contname=$RANDOM$RANDOM-delete-me     # name that must not exist
+    $docker container inspect "$contname" >/dev/null \
+        && die "Container $contname unexpectedly exists; remove it?"
 
     #   * We do not use -q here because we want to test that stdout/stderr
     #     are properly interleaved.
