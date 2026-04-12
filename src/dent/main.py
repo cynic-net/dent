@@ -51,11 +51,13 @@ BASE_IMAGES = OrderedDict((
     ('debian:10',       {}),
     ('debian:11',       {}),
     ('debian:12',       {}),
+    ('debian:13',       {}),
 #   ('ubuntu:14.04',    {}),
     ('ubuntu:16.04',    {}),
     ('ubuntu:18.04',    {}),
     ('ubuntu:20.04',    {}),
     ('ubuntu:22.04',    {}),
+    ('ubuntu:24.04',    {}),
 #   ('centos:6',        {}),    # But not with kernel ≥ 4.19 (works on 4.4).
 #   ('centos:7',        {}),    # Package repos are gone.
 #   ('centos:8',        {}),    # Package repos are gone.
@@ -64,6 +66,7 @@ BASE_IMAGES = OrderedDict((
                                 # but that's not in CentOS 7.
     ('fedora:30',       {}),
     ('fedora:38',       {}),
+    ('fedora:43',       {}),
 ))
 
 def resource_text(name):

@@ -23,6 +23,8 @@ will be tagged, but specific releases can also be fetched via the Git
 commit ID.
 
 ### dev
+- Added: `debian:13`, `ubuntu:24.04`, `fedora:43` to list of tested base
+  images. (Tested on `Linux deb12 6.1.0-32-amd64` kernel.)
 - Test: Typecheck and unit tests now run even without Docker available.
   Docker issues are warned early but only fail when Docker is actually used.
 - Test: New `-t`/`--test PART` option replaces `--skip-*` options; see
