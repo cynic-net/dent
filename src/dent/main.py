@@ -406,7 +406,12 @@ def build_image(config:Namespace):
 
 DOCKER_COMMAND:Tuple[str,...] = ('docker',)
 def docker_setup():
-    ' Determine whether we use ``docker`` or ``sudo docker``. '
+    ''' Determine whether we use ``docker`` or ``sudo docker``.
+
+        This does not honour ``--dry-run`` because 'query-state' docker
+        commands are always run; only 'change-state' docker commands are
+        echoed instead of run in dry-run mode.
+    '''
     global DOCKER_COMMAND
 
     retcode = call(DOCKER_COMMAND + ('info',), stdout=DEVNULL, stderr=DEVNULL)
@@ -483,8 +488,9 @@ def die(msg):
 
 def drcall(config, command, **kwargs):
     ''' Execute the `command` with `**kwargs` just as `subprocess.call()`
-        would unless we're doing a dry run, in which case just print
-        `command` to `stderr` and return success.
+        would unless we're doing a ``--dry-run``, in which case just print
+        `command` to `stderr` and return success. (Thus this should not be
+        used for gathering information, only for changing state.)
 
         This uses stderr rather than stdout becuase user messages are
         already going to `stdout` and so this allows more easily separating
