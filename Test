@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -e -o pipefail
-trap 'echo 1>&2 FAILED; exit 1' 0
+trap 'echo 1>&2 "FAILED ($(elapsed)s)"; exit 1' 0
 
 die() { echo 1>&2 -e "FAILURE:" "$@"; exit 1; }
 
@@ -9,6 +9,9 @@ adderror() {
     echo 2>&1 '***** ERROR:' "$@"
     errorlist+=("$*");
 }
+
+elapsed_start=$(date +%s)
+elapsed() { echo $(( $(date +%s) - $elapsed_start )); }
 
 docker_unavailable() {
     die 'Cannot run $docker due to setup_docker() failure (see above).'
@@ -315,4 +318,4 @@ for part in "${parts[@]}"; do
 done
 
 trap '' 0
-echo OK
+echo "OK ($(elapsed)s)"
