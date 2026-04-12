@@ -228,6 +228,11 @@ given:
   to create working interactive images. For somewhat silly reasons,
   this still requires a _CNAME_ argument, which is ignored.
 
+Otherwise the following options control the behaviour of `dent`, including
+how it creates new images and containers. All options and further settings
+are also available via the configuration file; see the next section for
+information on that.
+
 The following options control the behaviour of `dent`:
 * `-q, --quiet`: Do not print informational lines indicating what Docker
   image and container actions (remove/build/create) are being taken and use
@@ -278,14 +283,104 @@ The following options are used mainly for development and debugging:
   the start of the build. (This message is not suppressed by `-q`.)
 
 
+Configuration File
+------------------
 
-<!-------------------------------------------------------------------->
-[tmate]: https://tmate.io/
+`dent` reads configuration from `$XDG_CONFIG/dent/config.toml`, which
+defaults to `$HOME/.config/dent/config.toml`. Each top-level section is a
+named _configuration_ which can be selected via either the `-c CONFNAME`
+option or automatically via pattern matching on the container name you
+provide. The configuration file options are always applied before the
+command-line options, which may override them.
 
-[py-docker]: https://pypi.org/project/docker/
-[root]: https://github.com/0cjs/sedoc/blob/master/docker/security.md#leveraging-docker-for-root-access
+Currently, each section is stand-alone. You may specify only one `-c
+CONFNAME` argument; this will override any name matching (see below). All
+command line arguments are applied after (and may update) the configuration
+selected from the file.
 
-[gh-dent]: https://github.com/cynic-net/dent
-[pactivate]: https://github.com/cynic-net/pactivate
-[pi-dent]: https://pypi.org/project/dent
-[pipx]: https://pipx.pypa.io/
+### Example Configuration
+
+    [debian13]
+    names-matching = [ 'deb13*', '*-deb13' ]
+    base-image = 'debian:13'
+    share-ro = [    # only on same OS ver
+        '~/.local/state/mise/',
+        '~/.ghcup/',
+    ]
+    share-rw = '~/co/public/'
+    set-env = {
+      'TERM': 'xterm-256color',
+      'EDITOR': 'vi',
+    }
+    copy-env = 'LC_*'
+
+    [someco]
+    names-matching = [ 'someco*', '[0-9]someco*' ]
+    base-image = 'debian:13'
+    share-ro = [    # only on same OS ver
+        '~/.local/state/mise/',
+        '~/.ghcup/',
+    ]
+    share-rw = [
+        '~/co/public/',
+        '~/co/sensitive/someco/'
+    ]
+    set-env.TERM = 'xterm'
+
+### Configuration Directives
+
+- Directives marked __¹type__ are scalar values; subsequent specifications
+  will overwrite the previous value.
+- Directives marked __[type]__ are lists; scalars are treated as singleton
+  lists and subsequent values are appended to the list. An empty list will
+  clear any previous values in the list.
+- Directives marked __{type:type}__ are dictionaries; these may also be
+  specified in singleton form as `config_directive.NAME = VALUE`.
+
+The following directives cannot appear on the command line:
+
+* `names-matching` [str]: A list of shell glob patterns (using `*`,
+  `?` and `[…]` wildcards) that is matched against the given pattern. If
+  exactly one configuration section matches the name of the container to be
+  created/entered, that configuration will be used. Otherwise a warning
+  will be emitted and you must use `-c` to specify a configuration.
+
+<!--- XXX How about begining with `!` -->
+
+The following directives may be used on the command line (with `-C
+CONFIG_DIRECTIVE)` or specific 
+
+* `base-image` ¹str, `-B BASE_IMAGE`: Base image from which to build
+  container image.
+* `share-ro` [str], `-s SHARE_RO`, `--share-ro SHARE_RO`: Read-only bind
+  mount the given directories to the same paths inside the container.
+  Relative paths are relative to $HOME.
+* `share-rw` [str], `-s SHARE_RW`, `--share-ro SHARE_RW`: Read-write bind
+  mount the given directories to the same paths inside the container.
+  Relative paths are relative to $HOME.
+* `set-env` {name:value}, `-r=-e=NAME=VALUE`: Set the given environment
+  variables when the container is started.
+* `copy-env` [str]: On entering the container, copy the environment
+  variable named _str_ and its current value to the shell in the container.
+
+### Future Work
+
+- We will implement auto-chdir to on entry change the directory in the
+  container to the CWD on the host where `dent` was run. It's not clear if
+  this should always be enabled or be a feature that can be turned on and
+  off. (Possibly the latter if the container has a default CWD set on
+  build.)
+
+- We are considering ways to combine different configuration entries,
+  including:
+  - Allowing multiple `-c` specifications.
+  - Adding `-a` for additional specifications that are added even when
+    using `names-matching` rather than `-c`.
+  - `additional-match = true` to allow a particular entry to be an
+    additional match against the name along with one `= false` entry.
+  - `include.0 = NAME` to include from another entry.
+
+* Anything not special to this file (`names-matching`,
+  `containers-not-named` is taken as a command line argument)
+* These are applied before any command-line arguments.
+* Need an option to print out the fully parsed config we end up using.
