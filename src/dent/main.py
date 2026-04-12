@@ -46,8 +46,8 @@ BASE_IMAGES = OrderedDict((
     ('alpine:3.19',     { 'presetup': 'apk add bash', 'useradd': 'alpine' }),
     ('alpine:3.20',     { 'presetup': 'apk add bash', 'useradd': 'alpine' }),
     ('alpine:latest',   { 'presetup': 'apk add bash', 'useradd': 'alpine' }),
-#   ('debian:8',        {}),
-#   ('debian:9',        {}),
+#   ('debian:8',        {}),    # Archive package repos have issues
+#   ('debian:9',        {}),    # Archive package repos have issues
     ('debian:10',       {}),
     ('debian:11',       {}),
     ('debian:12',       {}),

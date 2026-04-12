@@ -23,6 +23,9 @@ will be tagged, but specific releases can also be fetched via the Git
 commit ID.
 
 ### dev
+- Fixed: `debian:10` builds now work again; EOL Debian releases (???10) are
+  redirected to `archive.debian.org` automatically. (Debian 8 and 9 have
+  additional issues that require further fixes.)
 - Added: `debian:13`, `ubuntu:24.04`, `fedora:43` to list of tested base
   images. (Tested on `Linux deb12 6.1.0-32-amd64` kernel.)
 - Test: Typecheck and unit tests now run even without Docker available.
