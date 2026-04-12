@@ -33,19 +33,19 @@ header() {
     [[ -z "$@" ]] || echo "┃   " "$@"
 }
 
-type_check() {
+test_typecheck() {
     echo '───── Type check'
     local args=()
     $verbose && args+=('-v')
     mypy "${args[@]}"   # default args in pyproject.toml.
 }
 
-unit_tests() {
+test_unittest() {
     echo '───── Unit tests'
     pytest #"$@"        # default args in pyproject.toml.
 }
 
-dryrun_tests() {
+test_dryrun() {
     echo '───── Dry run tests'
 
     local contname=$RANDOM$RANDOM-delete-me     # name that must not exist
@@ -81,7 +81,7 @@ dryrun_tests() {
     return 0    # Avoid error if $verbose is false.
 }
 
-nonbuild_tests() {
+test_nonbuild() {
     #   We are probably ok using a single image name for multiple
     #   (even simultaneous) test runs because the image never changes.
     etest_image=dent/test/nonbuild
@@ -176,7 +176,7 @@ nonbuild_tests() {
     echo "ok output='$output'"
 }
 
-build_tests() {
+test_build() {
     #   Unless arguments are passed in to test specific base images, all
     #   base images known to dent and viable on this platform are tested.
     header 'Builds from base images'
@@ -256,20 +256,15 @@ build_tests() {
     fi
 }
 
-skip() {
-    #   This differs from calling "nothing at all" with an empty
-    #   variable in that it accepts and ignores any arguments.
-    :
-}
+all_parts=(typecheck unittest dryrun nonbuild build)
 
 usage() {
     [[ "$@" ]] && echo 1>&2 "$@"
     sed -e 's/^        //' <<____ 1>&2
         Usage: $0 [OPTS …] [-- [PYTEST-ARGS]]
         OPTS (see doc/DEVEL.md for more details):
-            -T, --skip-typecheck
-            --skip-nonbuild
-            --skip-build
+            -t, --test PART     run only this part (may be repeated);
+                                parts: ${all_parts[@]}
             -B IMGNAME
             --keep-images
             --no-force-rebuild
@@ -285,22 +280,18 @@ command cd "$base"
 
 verbose=false
 small_clean=false
-skip_typecheck=false
-nonbuild_tests=nonbuild_tests
-build_tests=build_tests
+parts=()                    # empty = run all parts
 baseimages=()               # base images to test; default `dent -L`
 keep_images=false
 force_rebuild=--force-rebuild
 while true; do case "$1" in
     -h|--help)          usage;;
     -v|--verbose)       shift; verbose=true;;       # does not affect pytest
-    --skip-nonbuild)    shift; nonbuild_tests=skip;;
-    --skip-build)       shift; build_tests=skip;;
+    -t|--test)          shift; parts+=("$1"); shift;;
     -B)                 shift; baseimages+=("$1"); shift;;
     --keep-images)      shift; keep_images=true;;
     -f|--no-force-rebuild) shift; force_rebuild=;;  # ("fast" mode)
     -c|--small-clean)   shift; small_clean=true;;
-    -T|--skip-typechck) shift; skip_typecheck=true;;
     --)                 shift; break;;              # remaining args for pytest
     -*)                 usage "Unknown option '$1'";;
     *)                  break;;
@@ -317,11 +308,11 @@ $small_clean && {
 . ./pactivate -q
 setup_docker
 header
-$skip_typecheck || type_check
-unit_tests "$@"
-dryrun_tests
-$nonbuild_tests
-$build_tests "${baseimages[@]}"
+
+[[ ${#parts[@]} -eq 0 ]] && parts=("${all_parts[@]}")
+for part in "${parts[@]}"; do
+    test_$part "$@"
+done
 
 trap '' 0
 echo OK

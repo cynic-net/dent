@@ -2,9 +2,9 @@ Changelog
 =========
 
 This file follows most, but not all, of the conventions described at
-[keepachangelog.com]. Especially we always use [ISO dates]. Subsections or
-notations for changes may include Added, Changed, Deprecated, Fixed,
-Removed, and Security.
+[keepachangelog.com]. Especially we always use [ISO dates]. Subsection
+or area prefixes for changes may include:
+- Added, Changed, Deprecated, Fixed, Removed, Security, Test.
 
 Release version numbers follow the [Python packaging
 specifications][pyver], which are generally consistent with [semantic
@@ -25,6 +25,8 @@ commit ID.
 ### dev
 - Test: Typecheck and unit tests now run even without Docker available.
   Docker issues are warned early but only fail when Docker is actually used.
+- Test: New `-t`/`--test PART` option replaces `--skip-*` options; see
+  doc/DEVEL.md for details.
 
 ### 1.0.2 (2025-04-30)
 - Fixed: User with UID 1000 is now removed before trying to add the dent user.
