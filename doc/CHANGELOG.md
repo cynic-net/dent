@@ -23,6 +23,8 @@ will be tagged, but specific releases can also be fetched via the Git
 commit ID.
 
 ### dev
+
+### 1.0.3 (2026-05-05)
 - Added: `ubuntu:26.04` to supported releases.
 - Fixed: User should not be in `wheel`/`sudo` groups (complex details
   documented in `dent/setup-user`).
