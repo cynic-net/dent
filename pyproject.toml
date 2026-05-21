@@ -42,5 +42,6 @@ files       = [ 'src', 'src/**/*.pt' ]
 check_untyped_defs  = true
 
 [tool.pytest.ini_options]
+cache_dir = '.build/cache/pytest'
 testpaths = ['src']     # used only when pytest started from rootdir
 addopts   = ['-q', '-p pytest_pt', '--doctest-modules']

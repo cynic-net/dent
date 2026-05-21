@@ -304,7 +304,7 @@ $small_clean && {
     #   Even an editable package needs to be re-installed to update certain
     #   things, such as pyproject.toml metadata (e.g. the version number)
     #   and the non-Python scripts installed by setup.cfg.
-    rm -rf .build/virtualenv/
+    rm -rf .build/cache/ .build/virtualenv/
 }
 #   You can select another version of Python by using a .python link, e.g.:
 #       rm -rf .build && ln -s $(pythonz locate 3.5.10) .python
