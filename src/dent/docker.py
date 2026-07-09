@@ -1,7 +1,7 @@
 ''' dent.docker - Docker "API": execution of `docker` commands '''
 
 from    argparse  import Namespace
-#   We use the older high-level API so we work on Python <3.5.
+#   XXX Consider if we should be using a newer API than call().
 from    subprocess  import call, check_output, DEVNULL, CalledProcessError
 from    sys import stdout, stderr
 #   We use some older typing stuff to maintain 3.8 compatibility.
