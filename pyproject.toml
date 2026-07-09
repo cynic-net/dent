@@ -38,6 +38,10 @@ python_version = 3.9
 #   We must also have src/*/__init__.py files because mypy doesn't really
 #   understand namespace packages.
 files       = [ 'src', 'src/**/*.pt' ]
+#   Give each `*.pt` file a module name based on its filename (including
+#   extension); otherwise mypy considers all of them to be duplicate
+#   `__main__` modules.
+scripts_are_modules = true
 #   Type-check the interior of functions without type annotations.
 check_untyped_defs  = true
 
