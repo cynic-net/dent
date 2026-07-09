@@ -1,6 +1,5 @@
 ''' dent.container - container creation, startup and entry '''
 
-from    argparse  import Namespace
 from    pathlib import Path
 from    platform import node
 from    subprocess  import DEVNULL
@@ -8,12 +7,13 @@ from    sys import stdin, stdout, stderr
 import  os, time
 
 from    dent  import docker, image
+from    dent.configure  import Config
 from    dent.util  import PWENT, die, qprint
 
 ####################################################################
 #   Container entry.
 
-def enter_container(conf:Namespace):
+def enter_container(conf:Config):
     ' Enter the container, doing any dependent actions necessary. '
     docker.docker_setup()
 
@@ -66,7 +66,7 @@ def enter_container(conf:Namespace):
         print(' '.join(command), file=stderr)
         exit(0)
 
-def waitforstart(conf:Namespace):
+def waitforstart(conf:Config):
     ''' Wait for a container to start, dieing if it exits immediately.
 
         The `Docker API`_ does not indicate whether it guarantees it won't
@@ -93,7 +93,7 @@ def waitforstart(conf:Namespace):
 ####################################################################
 #   Container setup.
 
-def create_container(conf:Namespace):
+def create_container(conf:Config):
     ''' Create a new container for persistent use.
 
         This is designed simply to exist, and may be stopped and restarted
@@ -113,12 +113,12 @@ def create_container(conf:Namespace):
         #   If we found an image, use it. If we were explicitly requested
         #   to use a particular image, make sure we do not try to build it
         #   locally but let `docker run` try to download it.
-        qprint(conf,
+        qprint(conf.quiet,
             "Using existing image '{}'".format(image.image_alias(conf)))
     else:
         image.build_image(conf)
     user = PWENT.pw_name
-    qprint(conf, "Creating new container '{}' from image '{}' for user {}" \
+    qprint(conf.quiet, "Creating new container '{}' from image '{}' for user {}" \
         .format(conf.CONTAINER_NAME, image.image_alias(conf), user))
     command = docker.DOCKER_COMMAND + ('run',
         '--name='+conf.CONTAINER_NAME, '--hostname='+conf.CONTAINER_NAME,

@@ -1,18 +1,18 @@
 ''' dent.image - image configuration scripts, related files, and image build '''
 
-from    argparse  import Namespace
 from    collections import OrderedDict
+from    collections.abc  import Callable
 from    os.path import join as pjoin
 from    tempfile import mkdtemp
-from    typing  import Dict
 import  os, shutil, stat, string
 
 from    importlib_resources  import files as resfiles
 
 from    dent  import docker
+from    dent.configure  import Config, PrintFile
 from    dent.util  import PROGNAME, PWENT, die, qprint
 
-IMAGE_CONF  : Dict[str,str]
+IMAGE_CONF  : dict[str,str]
 
 ####################################################################
 #   Image configuration scripts and related files
@@ -67,7 +67,7 @@ SETUP_USER      = SETUP_HEADER + resource_text('setup-user')
 class PTemplate(string.Template):
     delimiter = '%'
 
-def dockerfile(conf:Namespace):
+def dockerfile(conf:Config) -> str:
     ' Return the text of `DOCKERFILE` with template substitution done. '
 
     #   The pre-setup command is run before /tmp/setup-*
@@ -81,7 +81,7 @@ def dockerfile(conf:Namespace):
     }
     return PTemplate(DOCKERFILE).substitute(dfargs)
 
-def setup_pkg(conf):
+def setup_pkg(conf:Config) -> str:
     ' Return the text of `SETUP_PKG` with template substitution done. '
     useradd = IMAGE_CONF.get('useradd') or 'generic'
     #   We avoid putting any user-related template arguments here so that
@@ -89,7 +89,7 @@ def setup_pkg(conf):
     #   this (fairly heavy) layer when user info changes.
     return PTemplate(SETUP_PKG).substitute({})
 
-def setup_user(conf:Namespace):
+def setup_user(conf:Config) -> str:
     ' Return the text of `SETUP_USER` with template substitution done. '
     useradd = IMAGE_CONF.get('useradd') or 'generic'
     template_args = {
@@ -103,7 +103,8 @@ def setup_user(conf:Namespace):
     return PTemplate(SETUP_USER).substitute(template_args)
 
 #   Things we can print with -P and their functions producing the text.
-PRINT_FILE_ARGS =  {
+#   The key type keeps these in sync with the -P choices in parseargs().
+PRINT_FILE_ARGS : dict[PrintFile,Callable[[Config],str]] = {
     'dockerfile':   dockerfile,
     'setup-pkg':    setup_pkg,
     'setup-user':   setup_user,
@@ -112,7 +113,7 @@ PRINT_FILE_ARGS =  {
 ####################################################################
 #   Container image build
 
-def build_image(conf:Namespace):
+def build_image(conf:Config):
     perm_r   = stat.S_IRUSR
     perm_rx  = perm_r  | stat.S_IXUSR
     perm_rwx = perm_rx | stat.S_IWUSR
@@ -121,7 +122,7 @@ def build_image(conf:Namespace):
     else:
         tmpdir = conf.tmpdir
         os.mkdir(tmpdir, perm_rwx)  # We want to die if it already exists
-    qprint(conf, 'Setting up context for image build in {}'.format(tmpdir),
+    qprint(conf.quiet, 'Setting up context for image build in {}'.format(tmpdir),
         force_print=conf.keep_tmpdir)
 
     with open(pjoin(tmpdir, 'Dockerfile'), 'w', encoding='UTF-8') as f:
@@ -137,12 +138,12 @@ def build_image(conf:Namespace):
         print(setup_user(conf), file=f)
 
     if conf.force_rebuild:
-        qprint(conf, "Removing image '{}' and forcing full rebuild" \
+        qprint(conf.quiet, "Removing image '{}' and forcing full rebuild" \
             .format(image_alias(conf)))
         docker.drcall(conf,
             docker.DOCKER_COMMAND + ('rmi', '-f', image_alias(conf)))
 
-    qprint(conf, "Building image '{}'".format(image_alias(conf)))
+    qprint(conf.quiet, "Building image '{}'".format(image_alias(conf)))
     command = docker.DOCKER_COMMAND + ('build',)
     if conf.progress:
         command += ('--progress=plain',)
@@ -159,7 +160,7 @@ def build_image(conf:Namespace):
     if not conf.keep_tmpdir:
         shutil.rmtree(tmpdir)
 
-def image_alias(conf:Namespace):
+def image_alias(conf:Config) -> str:
     ' "Alias" is name plus tag '
     if conf.image:
         return conf.image

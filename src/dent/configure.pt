@@ -1,5 +1,15 @@
-from    dent.configure  import parseargs
+from    dent.configure  import Config, parseargs
 import  pytest
+
+def test_parseargs_config():
+    conf = parseargs(['-B', 'debian:12', '-s', 'foo', 'mycont', 'echo', 'hi'])
+    assert isinstance(conf, Config)
+    assert ('debian:12', 'mycont', ['echo', 'hi'], ['foo'], False) \
+        == (conf.base_image, conf.CONTAINER_NAME, conf.COMMAND,
+            conf.share_ro, conf.quiet)
+
+def test_parseargs_default_command():
+    assert ['bash', '-l'] == parseargs(['mycont']).COMMAND
 
 def test_parseargs_bad():
     cname = 'my-container-name'

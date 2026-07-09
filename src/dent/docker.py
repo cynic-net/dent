@@ -1,16 +1,15 @@
 ''' dent.docker - Docker "API": execution of `docker` commands '''
 
-from    argparse  import Namespace
 #   XXX Consider if we should be using a newer API than call().
 from    subprocess  import call, check_output, DEVNULL, CalledProcessError
 from    sys import stdout, stderr
-#   We use some older typing stuff to maintain 3.8 compatibility.
-from    typing  import Any, Dict, Optional, Tuple
+from    typing  import Any
 import  json
 
+from    dent.configure  import Config
 from    dent.util  import die, qprint
 
-DOCKER_COMMAND:Tuple[str,...] = ('docker',)
+DOCKER_COMMAND:tuple[str,...] = ('docker',)
 def docker_setup():
     ''' Determine whether we use ``docker`` or ``sudo docker``.
 
@@ -31,7 +30,7 @@ def docker_setup():
         die('Cannot run `docker` as this user and cannot sudo.')
     DOCKER_COMMAND = ('sudo',) + DOCKER_COMMAND
 
-def docker_inspect(object:str, name:str) -> Optional[Dict[Any, Any]]:
+def docker_inspect(object:str, name:str) -> dict[Any,Any]|None:
     ''' Run ``docker `object` inspect `name```, where `object` is usually
         ``image`` or ``container``.
 
@@ -63,10 +62,10 @@ def docker_inspect(object:str, name:str) -> Optional[Dict[Any, Any]]:
     if len(l) == 0: return None
     else:           return l[0]
 
-def docker_container_start(conf:Namespace):
+def docker_container_start(conf:Config):
     ''' Run `docker container start` on the arguments.
     '''
-    qprint(conf, "Starting container '{}'".format(conf.CONTAINER_NAME))
+    qprint(conf.quiet, "Starting container '{}'".format(conf.CONTAINER_NAME))
     command = DOCKER_COMMAND + ('container', 'start', conf.CONTAINER_NAME)
     #   Suppress stdout because `docker` prints the names
     #   of the containers it started.
@@ -75,7 +74,7 @@ def docker_container_start(conf:Namespace):
         die("Couldn't start container")
     return None
 
-def drcall(conf, command, **kwargs):
+def drcall(conf:Config, command, **kwargs):
     ''' Execute the `command` with `**kwargs` just as `subprocess.call()`
         would unless we're doing a ``--dry-run``, in which case just print
         `command` to `stderr` and return success. (Thus this should not be

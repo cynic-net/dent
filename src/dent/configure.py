@@ -1,14 +1,47 @@
 ''' dent.configure - program configuration from command-line arguments '''
 
 from    argparse  import (
-        ArgumentParser, REMAINDER, RawDescriptionHelpFormatter, Namespace)
+        ArgumentParser, REMAINDER, RawDescriptionHelpFormatter)
+from    dataclasses  import dataclass
 from    importlib.metadata  import version
 from    textwrap import dedent
-from    typing  import List, Union
+from    typing  import Literal, get_args
 
-from    dent  import image
+#   Names of the files that -P can print; the functions producing their
+#   text are in `dent.image.PRINT_FILE_ARGS`, whose keys mypy checks
+#   against this type.
+PrintFile = Literal['dockerfile', 'setup-pkg', 'setup-user']
 
-def parseargs(argv:Union[List[str],None]=None) -> Namespace:
+@dataclass
+class Config:
+    ''' The program configuration, from command-line arguments and
+        (eventually) configuration files as well.
+
+        This is deliberately mutable: the program fills in some values as
+        they are computed (e.g. `image_alias()` sets `tag`), and there is
+        only a single user of this that uses it in a purely sequential
+        manner.
+    '''
+    #   parseargs() exits before constructing this when given the options
+    #   that may replace CONTAINER_NAME (--version, -L), so the name is
+    #   always present here.
+    CONTAINER_NAME  : str
+    COMMAND         : list[str]
+    base_image      : str|None
+    dry_run         : bool
+    force_rebuild   : bool
+    image           : str|None
+    keep_tmpdir     : bool
+    print_file      : PrintFile|None
+    progress        : bool
+    quiet           : bool
+    run_opt         : list[str]
+    share_ro        : list[str]
+    share_rw        : list[str]
+    tag             : str|None
+    tmpdir          : str|None
+
+def parseargs(argv:list[str]|None=None) -> Config:
     p = ArgumentParser(formatter_class=RawDescriptionHelpFormatter,
         description=dedent('''
             Start a new process in a Docker container, creating the container
@@ -23,7 +56,7 @@ def parseargs(argv:Union[List[str],None]=None) -> Namespace:
         help='base image from which to build container image')
     p.add_argument('-n', '--dry-run', action='store_true',
         help="don't execute docker image commands, just print them on stderr")
-    p.add_argument('-P', '--print-file', choices=image.PRINT_FILE_ARGS,
+    p.add_argument('-P', '--print-file', choices=get_args(PrintFile),
         help='Instead of building image, print given file to stdout.')
     p.add_argument('-V', '--progress', action='store_true',
         help='Set --progress=plain on `docker build` to see all build output.')
@@ -63,22 +96,27 @@ def parseargs(argv:Union[List[str],None]=None) -> Namespace:
     p.add_argument('COMMAND', nargs=REMAINDER, default='SEE BELOW',
         help='command to run in container (default: bash -l)')
 
-    conf = p.parse_args(argv)
+    ns = p.parse_args(argv)
 
     #   `default=` does not work with nargs=REMAINDER. We cannot use
     #   nargs='*' because that will cause options in the remainder to be
     #   interpreted as dent options unless the user adds `--` between,
     #   which is inconvenient.
-    if not conf.COMMAND: conf.COMMAND = ['bash', '-l']
+    if not ns.COMMAND: ns.COMMAND = ['bash', '-l']
 
     #   We handle these simple options that don't actually run any real
-    #   code here mainly because version needs access to the
-    #   ArgumentParser, and we'd prefer to keep that local.
-    if conf.version:
+    #   code here, rather than passing them on in the Config, mainly
+    #   because version needs access to the ArgumentParser, and we'd
+    #   prefer to keep that local.
+    if ns.version:
         print(f'{p.prog} version {version(p.prog)}')
         exit(0)
-    elif conf.list_base_images:
-        for i in image.BASE_IMAGES.keys(): print(i)
+    elif ns.list_base_images:
+        #   Imported here because dent.image imports this module.
+        from    dent.image  import BASE_IMAGES
+        for i in BASE_IMAGES.keys(): print(i)
         exit(0)
 
-    return conf
+    args = vars(ns)
+    del args['version'], args['list_base_images']
+    return Config(**args)

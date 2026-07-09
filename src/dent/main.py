@@ -12,7 +12,7 @@ def main():
 
     #   If we know the given base image name, get any special configuration
     #   for it. Otherwise we use a generic config.
-    image.IMAGE_CONF = image.BASE_IMAGES.get(conf.base_image) or {}
+    image.IMAGE_CONF = image.BASE_IMAGES.get(conf.base_image or '') or {}
 
     if conf.print_file and conf.CONTAINER_NAME:
         print(image.PRINT_FILE_ARGS[conf.print_file](conf))
