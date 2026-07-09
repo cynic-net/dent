@@ -3,14 +3,31 @@
 from    argparse  import (
         ArgumentParser, REMAINDER, RawDescriptionHelpFormatter)
 from    dataclasses  import dataclass
-from    importlib.metadata  import version
 from    textwrap import dedent
 from    typing  import Literal, get_args
 
 #   Names of the files that -P can print; the functions producing their
 #   text are in `dent.image.PRINT_FILE_ARGS`, whose keys mypy checks
 #   against this type.
-PrintFile = Literal['dockerfile', 'setup-pkg', 'setup-user']
+PrintFileName = Literal['dockerfile', 'setup-pkg', 'setup-user']
+
+####################################################################
+#   Commands: requests that main() do something entirely different
+#   from the standard dent container entry (which is specified by a
+#   Config, below).
+
+@dataclass(frozen=True)
+class PrintVersion: ...
+
+@dataclass(frozen=True)
+class ListBaseImages: ...
+
+@dataclass(frozen=True)
+class PrintFile:
+    file        : PrintFileName
+    base_image  : str|None      # the file contents depend on this
+
+Command = PrintVersion | ListBaseImages | PrintFile
 
 @dataclass
 class Config:
@@ -22,9 +39,9 @@ class Config:
         only a single user of this that uses it in a purely sequential
         manner.
     '''
-    #   parseargs() exits before constructing this when given the options
-    #   that may replace CONTAINER_NAME (--version, -L), so the name is
-    #   always present here.
+    #   parseargs() returns a Command instead of constructing this when
+    #   given the options that may replace CONTAINER_NAME (--version, -L,
+    #   -P), so the name is always present here.
     CONTAINER_NAME  : str
     COMMAND         : list[str]
     base_image      : str|None
@@ -32,7 +49,6 @@ class Config:
     force_rebuild   : bool
     image           : str|None
     keep_tmpdir     : bool
-    print_file      : PrintFile|None
     progress        : bool
     quiet           : bool
     run_opt         : list[str]
@@ -41,7 +57,14 @@ class Config:
     tag             : str|None
     tmpdir          : str|None
 
-def parseargs(argv:list[str]|None=None) -> Config:
+def parseargs(argv:list[str]|None=None) -> Command|Config:
+    ''' Parse the command line, returning a `Command` for options that
+        request something other than the standard container entry, or
+        otherwise the `Config` describing that entry.
+
+        This is pure but for one exception: ArgumentParser itself prints
+        and exits for bad arguments and --help.
+    '''
     p = ArgumentParser(formatter_class=RawDescriptionHelpFormatter,
         description=dedent('''
             Start a new process in a Docker container, creating the container
@@ -56,8 +79,6 @@ def parseargs(argv:list[str]|None=None) -> Config:
         help='base image from which to build container image')
     p.add_argument('-n', '--dry-run', action='store_true',
         help="don't execute docker image commands, just print them on stderr")
-    p.add_argument('-P', '--print-file', choices=get_args(PrintFile),
-        help='Instead of building image, print given file to stdout.')
     p.add_argument('-V', '--progress', action='store_true',
         help='Set --progress=plain on `docker build` to see all build output.')
     p.add_argument('-q', '--quiet', action='store_true')
@@ -89,6 +110,8 @@ def parseargs(argv:list[str]|None=None) -> Config:
         help='container name or ID (required)')
     pe.add_argument('-L', '--list-base-images', action='store_true',
         help='list base images this script knows how to configure')
+    pe.add_argument('-P', '--print-file', choices=get_args(PrintFileName),
+        help='instead of entering a container, print given file to stdout')
     pe.add_argument('--version', action='store_true',
         help='show program version information')
 
@@ -98,25 +121,16 @@ def parseargs(argv:list[str]|None=None) -> Config:
 
     ns = p.parse_args(argv)
 
+    if ns.version:              return PrintVersion()
+    if ns.list_base_images:     return ListBaseImages()
+    if ns.print_file:           return PrintFile(ns.print_file, ns.base_image)
+
     #   `default=` does not work with nargs=REMAINDER. We cannot use
     #   nargs='*' because that will cause options in the remainder to be
     #   interpreted as dent options unless the user adds `--` between,
     #   which is inconvenient.
     if not ns.COMMAND: ns.COMMAND = ['bash', '-l']
 
-    #   We handle these simple options that don't actually run any real
-    #   code here, rather than passing them on in the Config, mainly
-    #   because version needs access to the ArgumentParser, and we'd
-    #   prefer to keep that local.
-    if ns.version:
-        print(f'{p.prog} version {version(p.prog)}')
-        exit(0)
-    elif ns.list_base_images:
-        #   Imported here because dent.image imports this module.
-        from    dent.image  import BASE_IMAGES
-        for i in BASE_IMAGES.keys(): print(i)
-        exit(0)
-
     args = vars(ns)
-    del args['version'], args['list_base_images']
+    del args['version'], args['list_base_images'], args['print_file']
     return Config(**args)

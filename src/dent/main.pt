@@ -1,0 +1,20 @@
+from    dent.main  import main
+
+def test_main_version(capsys):
+    main(['--version'])
+    out, err = capsys.readouterr()
+    assert '' == err
+    assert out.startswith('pytest version ')    # we run under pytest's argv[0]
+
+def test_main_list_base_images(capsys):
+    main(['-L'])
+    out, err = capsys.readouterr()
+    assert '' == err
+    assert 'ubuntu' in out
+    assert 'debian' in out
+
+def test_main_print_file(capsys):
+    main(['-P', 'dockerfile', '-B', 'debian:12'])
+    out, err = capsys.readouterr()
+    assert '' == err
+    assert 'FROM debian:12' in out

@@ -9,7 +9,7 @@ import  os, shutil, stat, string
 from    importlib_resources  import files as resfiles
 
 from    dent  import docker
-from    dent.configure  import Config, PrintFile
+from    dent.configure  import Config, PrintFileName
 from    dent.util  import PROGNAME, PWENT, die, qprint
 
 IMAGE_CONF  : dict[str,str]
@@ -67,7 +67,7 @@ SETUP_USER      = SETUP_HEADER + resource_text('setup-user')
 class PTemplate(string.Template):
     delimiter = '%'
 
-def dockerfile(conf:Config) -> str:
+def dockerfile(base_image:str|None) -> str:
     ' Return the text of `DOCKERFILE` with template substitution done. '
 
     #   The pre-setup command is run before /tmp/setup-*
@@ -75,13 +75,13 @@ def dockerfile(conf:Config) -> str:
     #   config dict to e.g. install Bash so we can run the setup scripts.
     presetup_command = IMAGE_CONF.get('presetup') or 'true'
     dfargs = {
-        'base_image':       conf.base_image,
+        'base_image':       base_image,
         'presetup_command': presetup_command,
         'uname':            PWENT.pw_name,
     }
     return PTemplate(DOCKERFILE).substitute(dfargs)
 
-def setup_pkg(conf:Config) -> str:
+def setup_pkg(base_image:str|None) -> str:
     ' Return the text of `SETUP_PKG` with template substitution done. '
     useradd = IMAGE_CONF.get('useradd') or 'generic'
     #   We avoid putting any user-related template arguments here so that
@@ -89,7 +89,7 @@ def setup_pkg(conf:Config) -> str:
     #   this (fairly heavy) layer when user info changes.
     return PTemplate(SETUP_PKG).substitute({})
 
-def setup_user(conf:Config) -> str:
+def setup_user(base_image:str|None) -> str:
     ' Return the text of `SETUP_USER` with template substitution done. '
     useradd = IMAGE_CONF.get('useradd') or 'generic'
     template_args = {
@@ -104,7 +104,7 @@ def setup_user(conf:Config) -> str:
 
 #   Things we can print with -P and their functions producing the text.
 #   The key type keeps these in sync with the -P choices in parseargs().
-PRINT_FILE_ARGS : dict[PrintFile,Callable[[Config],str]] = {
+PRINT_FILE_ARGS : dict[PrintFileName,Callable[[str|None],str]] = {
     'dockerfile':   dockerfile,
     'setup-pkg':    setup_pkg,
     'setup-user':   setup_user,
@@ -127,15 +127,15 @@ def build_image(conf:Config):
 
     with open(pjoin(tmpdir, 'Dockerfile'), 'w', encoding='UTF-8') as f:
         os.fchmod(f.fileno(), perm_r)
-        print(dockerfile(conf), file=f)
+        print(dockerfile(conf.base_image), file=f)
 
     with open(pjoin(tmpdir, 'setup-pkg'), 'w', encoding='UTF-8') as f:
         os.fchmod(f.fileno(), perm_rx)
-        print(setup_pkg(conf), file=f)
+        print(setup_pkg(conf.base_image), file=f)
 
     with open(pjoin(tmpdir, 'setup-user'), 'w', encoding='UTF-8') as f:
         os.fchmod(f.fileno(), perm_rx)
-        print(setup_user(conf), file=f)
+        print(setup_user(conf.base_image), file=f)
 
     if conf.force_rebuild:
         qprint(conf.quiet, "Removing image '{}' and forcing full rebuild" \
