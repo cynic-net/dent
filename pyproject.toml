@@ -1,5 +1,5 @@
 [project]
-version = '1.0.3'
+version = '1.1.0.dev0'
 name = 'dent'
 description = 'Enter interactive shells in Docker containers and manage persistent containers'
 authors = [
@@ -11,7 +11,7 @@ urls.homepage = 'https://github.com/cynic-net/dent'
 urls.source = 'https://github.com/cynic-net/dent'
 urls.tracker = 'https://github.com/cynic-net/dent/issues'
 
-requires-python = '>=3.9'
+requires-python = '>=3.10'
 dependencies = ['importlib_resources']
 
 ####################################################################
@@ -34,7 +34,7 @@ build-backend = 'setuptools.build_meta'
 #   This locks all typing syntax to the specified version, even if you're using
 #   a later version of Python. (You do not need to have the specified version
 #   of Python available.) This should match project.requires-python above.
-python_version = 3.9
+python_version = '3.10'     # quote, not float!
 #   We must also have src/*/__init__.py files because mypy doesn't really
 #   understand namespace packages.
 files       = [ 'src', 'src/**/*.pt' ]

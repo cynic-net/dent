@@ -23,6 +23,7 @@ will be tagged, but specific releases can also be fetched via the Git
 commit ID.
 
 ### dev
+- Changed: Minimum Python version 3.9 → 3.10.
 
 ### 1.0.3 (2026-05-05)
 - Added: `ubuntu:26.04` to supported releases.
