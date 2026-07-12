@@ -54,6 +54,8 @@ BASE_IMAGES = OrderedDict((
     ('fedora:30',       {}),
     ('fedora:38',       {}),
     ('fedora:43',       {}),
+
+    ('archlinux:latest',{}),
 ))
 
 def resource_text(name):

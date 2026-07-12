@@ -16,9 +16,35 @@ packages() {
         packages_rpm
     elif type apk 2>/dev/null; then
         packages_apk
+    elif type pacman 2>/dev/null; then
+        packages_pacman
     else
         die 30 "Cannot find known package manager."
     fi
+}
+
+etckeeper_prepare() {
+    #   We must install git and set user.name/email before installing
+    #   etckeeper or etckeeper will be unable to commit.
+    git config --global user.name 'dent root user'
+    git config --global user.email 'root@dent.nonexistent'
+
+    #   Disable warning re default branch name changing to main in Git 3.0
+    git config --global advice.defaultBranchName false
+
+    #   .gitignore must be generated before etckeeper is installed,
+    #   and package mangers have a chance to initialize it.
+    cat >> /etc/.gitignore << _____ # The Docker host owns these files
+/hostname
+/hosts
+/resolv.conf
+_____
+}
+
+etckeeper_init() {
+    #   ≤14.04 always configures bzr, even if git is installed instead
+    sed -i -e '/^VCS=/s/.*/VCS="git"/' /etc/etckeeper/etckeeper.conf
+    etckeeper init
 }
 
 packages_apt() {
@@ -34,21 +60,14 @@ packages_apt() {
             /etc/apt/sources.list
     fi
     apt-get update || true
-    #   We must install git and set user.name/email before installing
-    #   etckeeper or etckeeper will be unable to commit.
+
     apt-get -y install git
-    git config --global user.name 'dent root user'
-    git config --global user.email 'root@dent.nonexistent'
+    etckeeper_prepare
     #   Install etckeeper as early as posible so we have a record of
     #   the following installs.
-    cat >> /etc/.gitignore << _____ # The Docker host owns these files
-/hosts
-/resolv.conf
-_____
     apt-get -y install etckeeper
-    #   ≤14.04 always configures bzr, even if git is installed instead
-    sed -i -e '/^VCS=/s/.*/VCS="git"/' /etc/etckeeper/etckeeper.conf
-    etckeeper init
+    etckeeper_init
+
     #   It's not worth the time to run dist-upgrade now so as to have
     #   the latest packages in the image because the image will be out
     #   of date in a week or two anyway and the user will still have
@@ -81,6 +100,17 @@ packages_apk() {
     #   XXX This should set up etckeeper.
     apk update
     apk add $UNIVERSAL_PKGS man-pages man-pages-posix
+}
+
+packages_pacman () {
+    pacman -Syu --noconfirm git
+    etckeeper_prepare
+    #   Install etckeeper as early as posible so we have a record of
+    #   the following installs.
+    pacman -S --noconfirm etckeeper
+    etckeeper_init
+
+    pacman -S --noconfirm $UNIVERSAL_PKGS
 }
 
 ####################################################################
