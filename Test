@@ -247,6 +247,11 @@ test_build() {
             #   Confirm that user can use sudo.
             dent $container sudo -v -S </dev/null \
                 || adderror "$baseimage: user cannot sudo"
+
+            #   If etckeeper is available, confirm that it is initialized.
+            ! dent $container etckeeper --version > /dev/null \
+                || dent $container sudo etckeeper vcs status \
+                || adderror "$baseimage: etckeeper not initialized"
         fi
 
         echo -n "docker container rm -f $container: "
