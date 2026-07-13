@@ -46,6 +46,7 @@ class Config:
     COMMAND         : list[str]
     base_image      : str|None
     dry_run         : bool
+    env_copy        : list[str]
     force_rebuild   : bool
     image           : str|None
     keep_tmpdir     : bool
@@ -56,6 +57,16 @@ class Config:
     share_rw        : list[str]
     tag             : str|None
     tmpdir          : str|None
+
+    @staticmethod
+    def testconfig(**kwargs) -> 'Config':
+        defaults:dict = { 'CONTAINER_NAME':'Xcname', 'COMMAND':[],
+            'base_image':None, 'dry_run':False, 'env_copy':[],
+            'force_rebuild':False, 'image':None, 'keep_tmpdir':False,
+            'progress':False, 'quiet':False, 'run_opt':[], 'share_ro':[],
+            'share_rw':[], 'tag':None, 'tmpdir':None,
+            }
+        return Config(**(defaults|kwargs))
 
 def parseargs(argv:list[str]|None=None) -> Command|Config:
     ''' Parse the command line, returning a `Command` for options that
@@ -104,6 +115,11 @@ def parseargs(argv:list[str]|None=None) -> Command|Config:
         ' for creating a new container (downloaded if necessary)')
     pi.add_argument('-t', '--tag',
         help="tag to use for image (default: username); cannot be used with -i")
+
+    #   Options that apply to entering containers
+    pi.add_argument('-e', '--env-copy', metavar='NAME',
+        action='append', default=[], help='environment passthrough: copy'
+        ' into the container (at entry time) the named env vars')
 
     #   We must have either a container name or one of the options that
     #   requests information.

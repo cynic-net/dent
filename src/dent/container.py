@@ -1,10 +1,12 @@
 ''' dent.container - container creation, startup and entry '''
 
-from    pathlib import Path
-from    platform import node
+from    datetime  import datetime
+from    pathlib  import Path
+from    platform  import node
 from    subprocess  import DEVNULL
-from    sys import stdin, stdout, stderr
-import  os, time
+from    sys  import stdin, stdout, stderr, argv
+from    textwrap  import dedent
+import  os, shlex, time
 
 from    dent  import docker, image
 from    dent.configure  import Config
@@ -39,13 +41,28 @@ def enter_container(conf:Config):
 
     container = docker.docker_inspect('container', conf.CONTAINER_NAME)
     if container is None:
-        create_container(conf)      # Also starts
-    elif not_on_existing:
-        die(not_on_existing_msg)
-    elif not container['State']['Running']:
-        docker.docker_container_start(conf)
+        create_container(conf)      # Also starts, with the shared dir
+        has_share = True
+    else:   # container exists (but might not be started yet)
+        if not_on_existing:
+            die(not_on_existing_msg)
+        if not container['State']['Running']:
+            docker.docker_container_start(conf)
+        #   Only containers created with the shared dir get the startup-file
+        #   launcher; a foreign container (possibly without bash) is entered
+        #   directly. Read from the inspect data we already have; no extra
+        #   docker call.
+        has_share = any( m.get('Destination') == str(dent_share(conf))
+                         for m in (container.get('Mounts') or []) )
 
     waitforstart(conf)
+
+    #   WARNING: The command below must NOT copy $XDG_STATE_DIR or $HOME
+    #   into the container. The container was set up with a specifc
+    #   $XDG_STATE_HOME (or default $HOME/.local/state) and mounted the
+    #   dent share based on that: different values will silently disable
+    #   the entry script as $HOME/.local/bin/dent-share will no longer
+    #   be able to find it.
 
     #   Rather than using `container.exec_run() and then rewriting the same
     #   code to deal with the copying of stdin/out/err between what the
@@ -59,7 +76,28 @@ def enter_container(conf:Config):
     if stdin.isatty():
         command.append('-t')
     command.append(conf.CONTAINER_NAME)
-    command += conf.COMMAND
+    #   Containers created with the dent share are entered via a launcher
+    #   that sources a per-entry startup file then execs the requested
+    #   command; the `[ -f ]` guard tolerates a missing file. Others are
+    #   entered directly.
+    if has_share:
+        #   Write even on dry run so we can inspect its contents.
+        esfname = write_entry_script(conf)
+        contfile = '$HOME/.local/bin/dent-share'
+        #   We pass a single command to `sh -c` run in the container, which:
+        #   1. Checks to see if the entry script is present. (It was created
+        #      on the host, but container config determines if it's actually
+        #      shared into the container.)
+        #   2. If it's present, sources it with the `.` command.
+        #   3. exec's "$@", which will be conf.COMMAND, either the remaining
+        #      arguments given on the dent command line or the dent's
+        #      default `bash -l`. (XXX this really should be the user's shell,
+        #      not hardcoded to bash.)
+        cont_sh_c = f'[ -f "{contfile}" ] && ls -l {contfile} ' \
+            f' && eval "$({contfile} cat-entry-script {esfname})"; exec "$@"'
+        command += ['sh', '-c', cont_sh_c, 'argv0'] + conf.COMMAND
+    else:
+        command += conf.COMMAND
     stdout.flush(); stderr.flush()  # Ensure all our output is complete
                                     # before this process is replaced.
     if not conf.dry_run:
@@ -94,6 +132,87 @@ def waitforstart(conf:Config):
         die("Cannot start container '{}'".format(conf.CONTAINER_NAME))
 
 ####################################################################
+#   Per-container shared dir and entry startup files.
+
+#   Entry startup files retained per container; older ones are reaped, but
+#   never any younger than STARTUP_MIN_AGE seconds (so a slow host starting
+#   many entries at once can't reap one still in use).
+STARTUP_KEEP    = 12
+STARTUP_MIN_AGE = 120
+
+def dent_share(conf:Config) -> Path:
+    ''' For images/containers created by dent, we create a *dent share*: a
+        directory used to pass information back and forth (entry
+        initialisation code, copy/paste stuff, sockets, and anything the user
+        wants to share). It is bind-mounted at the same path in host and
+        container (which relies on their ``$HOME`` matching, as `share_args`
+        also assumes) and lives at ``dent/<container>`` under the standard XDG
+        state dir (``${XDG_STATE_HOME:-$HOME/.local/state}``); we use that
+        instead of ``$XDG_RUNTIME_DIR`` because containers often outlive the
+        session owning the runtime dir.
+
+        This must agree with the `dent-share` script, which computes the
+        same path for the user inside and outside the container.
+    '''
+    state = os.environ.get('XDG_STATE_HOME') or Path.home()/'.local'/'state'
+    return Path(state) / 'dent' / conf.CONTAINER_NAME
+
+def write_entry_script(conf:Config) -> str:
+    ''' At each entry write a startup script to be executed inside the
+        container before the user's shell. This is intended to carry
+        context read *at entry time* from the host into the container
+        (CWD, env vars, etc.).
+
+        Returns the path of the startup file. The path is expected
+        to be sourced in the container by the entry launcher. Note
+        that it will be sourced by a POSIX `sh`, not `bash`, as bash
+        is not always available in every container.
+
+        The file is typically retained for debugging; this function
+        will reap old files that are no longer needed by calling
+        `reap_startup_files()`.
+    '''
+    scriptdir = dent_share(conf) / 'entry-script'
+    scriptdir.mkdir(parents=True, exist_ok=True)
+    now = datetime.now()
+    fname = f'startup.{now.strftime("%Y%m%dT%H%M%S")}.{os.getpid()}'
+    f = scriptdir / fname
+    f.write_text(startup_file_text(conf, now))
+    reap_startup_files(scriptdir, STARTUP_KEEP, STARTUP_MIN_AGE)
+    return fname
+
+def startup_file_text(conf:Config, now:datetime, environ=None) -> str:
+    Q = shlex.quote
+    cwd = os.getcwd()
+    if environ is None:  environ = os.environ
+
+    nows = now.isoformat(timespec='seconds')
+    head = dedent(f'''
+        #   dent entry {nows}  container={conf.CONTAINER_NAME}  host-pid={os.getpid()}
+        #   host cwd: {cwd}
+        #   argv: {argv}
+        command cd {Q(cwd)} 2>/dev/null || true
+    ''')
+    envs = '\n'.join([
+        f'export {var}={Q(environ[var])}'
+        for var in conf.env_copy
+        if var in environ ])
+    return '\n'.join([head, envs])
+
+def reap_startup_files(scriptdir:Path, keep:int, min_age:float):
+    ''' Delete startup files in `scriptdir` beyond the newest `keep`, but never
+        any younger than `min_age` seconds.
+    '''
+    try:
+        now = time.time()
+        fs = sorted(scriptdir.glob('startup.*'), key=lambda p: p.stat().st_mtime)
+        for p in fs[:-keep]:
+            if now - p.stat().st_mtime >= min_age:
+                p.unlink(missing_ok=True)
+    except OSError:
+        pass    # best-effort; never fail entry over reaping
+
+####################################################################
 #   Container setup.
 
 def create_container(conf:Config):
@@ -108,6 +227,16 @@ def create_container(conf:Config):
     '''
     shared_path_opts \
         = share_args(conf.share_ro, 'ro') + share_args(conf.share_rw, 'rw')
+
+    share = dent_share(conf)
+    (share / 'entry-script').mkdir(parents=True, exist_ok=True)
+    dent_share_opt = '-v={0}:{0}'.format(share)
+
+    #   Pass the host's XDG_* vars through at creation (not on entry) so the
+    #   container's XDG layout — in particular XDG_STATE_HOME, which locates
+    #   the dent share ??? matches the host's. `docker exec` inherits these.
+    xdg_env = tuple('--env=' + k
+        for k in sorted(os.environ) if k.startswith('XDG_'))
 
     images = docker.docker_inspect('image', image.image_alias(conf))
     if conf.force_rebuild:
@@ -126,9 +255,10 @@ def create_container(conf:Config):
     command = docker.DOCKER_COMMAND + ('run',
         '--name='+conf.CONTAINER_NAME, '--hostname='+conf.CONTAINER_NAME,
         '--env=HOST_HOSTNAME='+node(),
+        '--env=DENT_CONTAINER='+conf.CONTAINER_NAME,
         '--env=LOGNAME='+user, '--env=USER='+user,
         '--rm=false', '--detach=true', '--tty=false',
-        *shared_path_opts, *conf.run_opt,
+        *xdg_env, *shared_path_opts, dent_share_opt, *conf.run_opt,
         image.image_alias(conf), 'tail', '-f', '/dev/null' )
     retcode = docker.drcall(conf, command, stdout=DEVNULL)
                                             # stdout prints container ID

@@ -94,3 +94,27 @@ as manual `docker` commands run by the user.
    IMAGE` option. (Ideas for making the setup script more general are
    welcome.)
 
+### 'Dent Share' Communications Mechanism
+
+When dent creates a container, it always creates a _dent share_ directory
+which is a read/write bind mount between the host and the container. (This
+is in addition to any shares specified with `-s` or `-S`.) This is used for
+communication between the host and the container.
+
+The directories have the same names as their containers and are stored
+under `${XDG_STATE_DIR}/dent/`. (This defaults to `$HOME/.local/state/dent`
+if $XDG_STATE_DIR is not set.) This path can be printed by running
+`dent-share dir` (the `dent-share` script included with `dent`). If given a
+second argument after the subcommand, that will be considered a container
+name and appended to the printed path, e.g., `ls -lt "$(dent-share dir
+somecont)/entry-script/"`. Within a container you can use the
+`$DENT_CONTAINER` environment variable to determine your container name.
+
+The system is used mainly for an _entry script_ that does initial setup of
+the environment when `dent` enters a container. This includes changing the
+container's current working directory to be the same as it was on the host,
+if that directory exists in the container. The exact environment and
+execution of the script can be confirmed by looking at the most recent file
+in `"$(dent-share-dir $DENT_CONTAINER)/entry-script/"`; the last few of
+these are kept around for debugging purposes. (For more on exactly how
+those are written, see `dent.container.write_startup_file()`.)

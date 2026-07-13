@@ -3,6 +3,7 @@ To-do Lists
 
 ### Bugs
 
+- On entry we run `bash` by default; we should run the user's shell.
 - The `-i` option, if given an image name that doesn't exist, should
   not just be creating it `FROM None` but should require a base image.
   The code to catch the lack of a base image specification when needed

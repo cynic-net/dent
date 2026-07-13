@@ -102,6 +102,13 @@ Roughly, `dent` does the following when you try to enter a container:
    being used on the host. Various other setup is done and the container is
    started and entered per the steps above.
 
+When dent creates a container, it always creates a 'dent share' directory
+shared read/write between the host and the container. (This is in addition
+to any shares specified with `-s` or `-S`.) This is used for communication
+between the host and the container. The `dent-share` script and
+`$DENT_CONTAINER` enviroment variable can be used to find the location of
+the dent share.
+
 This is just a brief overview; for full details see [`doc/operation.md`].
 
 

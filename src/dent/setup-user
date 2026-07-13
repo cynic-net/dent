@@ -86,5 +86,24 @@ dot_home() {
     fi
 }
 
+dent_share_setup() {
+    echo '-- dent-share install and share dir'
+    #   Run as the user so we get correct ownerships and interpretation of
+    #   $XDG_STATE_HOME, $HOME, ~, etc.
+    #   1. Install dent-share into ~/.local/bin
+    #   2. Create the paths leading to $(dent-share) so that they are
+    #      owned by the user. (If `docker run` creates them, they will be
+    #      owned by root.)
+    #   On container creation we will bind-mount the dent share in
+    #   $(dent-share).
+    sudo -u %{uname} -H bash -c '
+        set -e
+        mkdir -p ~/.local/bin
+        install -m 0755 /tmp/dent-share ~/.local/bin/dent-share
+        mkdir -p "$(~/.local/bin/dent-share dir)"
+    '
+}
+
 users_%{useradd}
 dot_home
+dent_share_setup

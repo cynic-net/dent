@@ -222,13 +222,14 @@ test_build() {
             #   Tests on container now that we know it comes up.
 
             testvar() {
+                echo '  testvar' "$@"
                 VAR="$1"; shift
                 VALUE="$1"; shift
-                if ! dent $container bash -c "echo $VAR=\$$VAR" \
+                if ! dent "$@" $container bash -c "echo $VAR=\$$VAR" \
                      | grep -q "$VAR=$VALUE"
                 then
                     adderror "$baseimage: expected $VAR='$VALUE'"
-                    dent 1>&2 $container bash -c "echo $VAR=\$$VAR"
+                    dent 1>&2 "$@" $container bash -c "echo $VAR=\$$VAR"
                 fi
             }
             #   Confirm that we're ensuring $USER and $LOGNAME are set (even
@@ -238,6 +239,10 @@ test_build() {
             testvar USER "$USER"
             testvar LOGNAME "$LOGNAME"
             testvar HOST_HOSTNAME "$HOSTNAME"
+
+            #   Confirm that variables copied with -e are avaialable.
+            export COPIED_VAR='a $copy'
+            testvar COPIED_VAR 'a $copy' --env-copy COPIED_VAR
 
             #   Confirm that user can use sudo.
             dent $container sudo -v -S </dev/null \

@@ -1,4 +1,7 @@
-from    dent.container  import share_args
+from    dent.configure  import Config
+from    dent.container  import share_args, startup_file_text
+
+from    datetime import datetime
 from    pathlib  import Path
 
 def test_share_args():
@@ -8,3 +11,16 @@ def test_share_args():
                 '-v=/home/bar/baz:/home/bar/baz:rw',
                f'-v={home}/quux:{home}/quux:rw',
            ] == ps
+
+def test_startup_file_text():
+    conf = Config.testconfig(env_copy=['EXISTS', 'NOT_EXISTS', 'X'])
+    print(conf)
+    now = datetime.now()
+    env = { 'NOCOPY':'foo', 'EXISTS':'one', 'X':'''"'"'''} # NOT_EXISTS unset
+
+    s = startup_file_text(conf, now, env) ; print(s)
+    assert 'command cd' in s
+    assert 'NOTEXISTS' not in s
+    assert 'NOCOPY' not in s
+    assert 'EXISTS=one' in s
+    assert '''   X='"'"'"'"'   '''.strip() in s
