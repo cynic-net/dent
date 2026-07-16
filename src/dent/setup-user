@@ -71,13 +71,15 @@ dot_home() {
     local url_prefix=https://raw.githubusercontent.com/dot-home/dot-home
     local url_branch=main
     local url="$url_prefix/$url_branch/bootstrap-user"
-    export LOGNAME=%{uname} HOME=~%{uname}
-    export DH_BOOTSTRAP_USERS="$url_prefix/$url_branch/dh/bootstrap-users"
+    local home=~%{uname} logname=%{uname}
 
-    rm -f $HOME/.profile $HOME/.bash_profile $HOME/.bashrc
-
-    if curl -sfL "$url" | sudo -E -u $LOGNAME bash; then
-        echo "dot-home installed for user $LOGNAME"
+    rm -f $home/.profile $home/.bash_profile $home/.bashrc
+    if  curl -sfL "$url" \
+        | LOGNAME=$logname HOME=$home \
+          DH_BOOTSTRAP_USERS="$url_prefix/$url_branch/dh/bootstrap-users" \
+          sudo -E -u $logname bash
+    then
+        echo "dot-home installed for user $logname"
     else
         echo "WARNING: dot-home install failure"
         sleep 3
