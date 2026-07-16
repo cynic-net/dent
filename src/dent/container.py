@@ -126,7 +126,7 @@ def create_container(conf:Config):
         '--env=LOGNAME='+user, '--env=USER='+user,
         '--rm=false', '--detach=true', '--tty=false',
         *shared_path_opts, *conf.run_opt,
-        image.image_alias(conf), '/bin/sleep', str(2**31-1) )
+        image.image_alias(conf), 'tail', '-f', '/dev/null' )
     retcode = docker.drcall(conf, command, stdout=DEVNULL)
                                             # stdout prints container ID
     if retcode != 0:

@@ -63,6 +63,7 @@ test_dryrun() {
                            --run-opt=-P -r=--cpu-count=1 \
                            $contname true) \
         || die "exitcode=$? output='$output'"
+    #   All newlines/spaces below will be deleted; use `.` instead of space.
     expected=$(echo '
         .* -----.Removing.image
         .* docker.rmi.-f
@@ -72,7 +73,7 @@ test_dryrun() {
         .* docker.run.--name=[[:digit:]]*-delete-me
         .*    --rm=false.*--detach=true.*--tty=false
         .*    -P.*--cpu-count=1
-        .*   /bin/sleep.2147483647
+        .*   tail.-f./dev/null
         ' | tr -d '\n ' )
     [[ $output =~ $expected ]] || die "dryrun bad output:\n$output"
     echo 'dryrun ok'
