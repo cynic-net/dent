@@ -27,12 +27,14 @@ def enter_container(conf:Config):
     #   don't need to rebuild if base_image is the same now as when it
     #   was when it was built. (Otherwise query user about rebuild?)
     #
-    not_on_existing = (conf.base_image is not None)                   \
-        or (len(conf.run_opt) > 0)                                    \
-        or (len(conf.share_ro) > 0)                                   \
+    not_on_existing = (
+           (conf.base_image is not None)
+        or (len(conf.run_opt) > 0)
+        or (len(conf.share_ro) > 0)
         or (len(conf.share_rw) > 0)
-    not_on_existing_msg =                                               \
-         '-B, -r and -s options cannot affect existing containers'
+        )
+    not_on_existing_msg \
+        = '-B, -r and -s options cannot affect existing containers'
 
     container = docker.docker_inspect('container', conf.CONTAINER_NAME)
     if container is None:
