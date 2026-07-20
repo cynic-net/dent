@@ -72,16 +72,18 @@ def parseargs(argv:list[str]|None=None) -> Command|Config:
                 https://github.com/cynic-net/dent
         '''))
 
-    #   General options
+    #   General options that apply to most commands
+    p.add_argument('-n', '--dry-run', action='store_true',
+        help="don't execute docker image commands, just print them on stderr")
+    p.add_argument('-q', '--quiet', action='store_true')
+
+    #   Options that apply to building images and containers
     p.add_argument('--keep-tmpdir', action='store_true',
         help='when done, do not delete tmpdir containing build files')
     p.add_argument('-B', '--base-image',
         help='base image from which to build container image')
-    p.add_argument('-n', '--dry-run', action='store_true',
-        help="don't execute docker image commands, just print them on stderr")
     p.add_argument('-V', '--progress', action='store_true',
         help='Set --progress=plain on `docker build` to see all build output.')
-    p.add_argument('-q', '--quiet', action='store_true')
     p.add_argument('-R', '--force-rebuild', action='store_true',
         help='untag any existing image and rebuild it, ignoring cached images'
              " (only if container doesn't exist)")
