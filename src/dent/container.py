@@ -29,12 +29,13 @@ def enter_container(conf:Config):
     #
     not_on_existing = (
            (conf.base_image is not None)
+        or (conf.image is not None)
         or (len(conf.run_opt) > 0)
         or (len(conf.share_ro) > 0)
         or (len(conf.share_rw) > 0)
         )
     not_on_existing_msg \
-        = '-B, -r and -s options cannot affect existing containers'
+        = '-B, -i, -r and -s options cannot affect existing containers'
 
     container = docker.docker_inspect('container', conf.CONTAINER_NAME)
     if container is None:

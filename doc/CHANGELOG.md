@@ -24,6 +24,7 @@ commit ID.
 
 ### dev
 - Changed: Minimum Python version 3.9 → 3.10.
+- Changed: die if --image is used on existing container.
 
 ### 1.0.3 (2026-05-05)
 - Added: `ubuntu:26.04` to supported releases.
