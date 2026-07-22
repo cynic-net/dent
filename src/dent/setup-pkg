@@ -83,4 +83,14 @@ packages_apk() {
     apk add $UNIVERSAL_PKGS man-pages man-pages-posix
 }
 
+####################################################################
+#   Main
+
+#   Unlike the old 'build', the new 'buildx' does not give you an
+#   /etc/hostname file during image builds. (And why would it? You don't
+#   have a hostname at that point.) This can break various things, such as
+#   Arch Linux's etckeeper package, that expect it to be there. So we
+#   create a fake one just to avoid problems.
+[[ -e /etc/hostname ]] || echo 'buildx' > /etc/hostname
+
 packages
