@@ -1,5 +1,5 @@
-`dent` Usage, Options and Configuration
-========================================
+Dent Usage, Options and Configuration
+=====================================
 
 Reading the short [§"Operation Overview"][oper-ov] section in
 `doc/operation.md` will make this document considerably easier to
@@ -12,13 +12,13 @@ understand.
 Runs the given _COMMAND_ in container _CONTAINER_NAME_ using `docker
 exec -it CONTAINER_NAME` or similar. If you supply any _arg_ values
 that start with a hyphen, ensure you use the `--` after the container
-name to avoid these being parsed as options to `dent`.
+name to avoid these being parsed as options to Dent.
 
 _CONTAINER_NAME_ is a container name or ID. An existing container with
 that name will always be used if present (it will be started if it's
 stopped), otherwise it's the name of the container to be created. If
 you share the host with other users, you may want to adopt a container
-naming convention to avoid name collisions. `dent` currently provides
+naming convention to avoid name collisions. Dent currently provides
 no support for this; it uses the container name exactly as specified.
 
 The default _COMMAND_ is `bash -l` to give an interactive login shell.
@@ -28,14 +28,14 @@ to use a shell alias) use `-- bash -lc 'cmd arg ...'`.
 
 The user and initial working directory within the container will be
 the same as specified by the `docker run` command; this is specified
-by the image if `dent` created the container. There is currently no
+by the image if Dent created the container. There is currently no
 way to override this.
 
 Notes on `docker exec` options:
 - The `-t` option (allocate a pseudo-TTY) will be used only if stdin
   is a terminal. There is currently no way to override this.
 - The `-i` option (keep stdin open when detached) is always used;
-  there seems to be no reason ever not to use it because `dent`
+  there seems to be no reason ever not to use it because Dent
   currently does not support `-d` (detached mode).
 
 #### Options
@@ -44,11 +44,11 @@ No container command is run if either of the following two options are
 given:
 * `-h`, `--help`: Ignore all other arguments and print a usage
   summary.
-* `-L`, `--list-base-images`: List base images `dent` knows it can use
+* `-L`, `--list-base-images`: List base images Dent knows it can use
   to create working interactive images. For somewhat silly reasons,
   this still requires a _CNAME_ argument, which is ignored.
 
-The following options control the behaviour of `dent`:
+The following options control the behaviour of Dent:
 * `-q, --quiet`: Do not print informational lines indicating what Docker
   image and container actions (remove/build/create) are being taken and use
   `docker build --quiet` when building an image.
@@ -84,7 +84,7 @@ The following optons control container creation:
   argument rather than two arguments to `docker run`. Instead, use
   `-r -e=FOO=bar`.
 
-  Note also that `-r` can be used _only_ when `dent` is creating a new
+  Note also that `-r` can be used _only_ when Dent is creating a new
   container. If it finds an existing container that it would use, it
   will generate an error explaining that the `-r` option would have
   no effect.

@@ -73,7 +73,7 @@ To-do Lists
 - `centos:6` Bash (and `centos:5`, too) throws a segfault for some
   programs (`bash`, `yum`) on a 4.19 kernel (though it works on on
   4.9). Test knows about this, and avoids running the tests. Is there
-  something else we can do to help with this? Ideally, dent should be
+  something else we can do to help with this? Ideally, Dent should be
   able to help with this in as transparent a way possible.
 
 Discarded Ideas

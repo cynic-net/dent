@@ -1,8 +1,8 @@
 #!/usr/bin/env sh
 #
-#   dent-share - functions related to dent's host/container shared dirs
+#   dent-share - functions related to Dent's host/container shared dirs
 #
-#   The _dent share_ is a directory shared between the host and a dent
+#   The _dent share_ is a directory shared between the host and a Dent
 #   container, used to pass files, sockets, etc. between them. (It is
 #   normally bind-mounted at the same path in both.) It lives at
 #   $XDG_STATE_HOME/dent/<container>, with, per the XDG spec,
@@ -44,13 +44,13 @@ Commands:
 
 * dir [CONTAINER]: Print _container_'s share dir
   - With CONTAINER, print that container's share dir.
-  - Else if \$DENT_CONTAINER is set (as it is inside a dent container),
+  - Else if \$DENT_CONTAINER is set (as it is inside a Dent container),
     print that container's share dir.
   - Else print the base dir holding every container's share.
 
 * cat-entry-script SCRIPTNAME: Print the entry script SCRIPTNAME (typically
   something like 'startup.20260720T123922.58937'. If not found (i.e., the
-  dent share isn't working properly), print nothing. This is intended to be
+  Dent share isn't working properly), print nothing. This is intended to be
   'eval'd by the code that executes the entry.
 
 _____

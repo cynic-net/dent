@@ -139,7 +139,7 @@ test_nonbuild() {
     }
 
     echo '≡≡≡≡≡ Container creation from missing pre-existing image '
-    #   We need to confirm that dent tries to download the image, rather than
+    #   We need to confirm that Dent tries to download the image, rather than
     #   trying to build it locally. This means the image must not already
     #   be on the existing system, but we can't delete local images because
     #   they might be in use by other images or containers. So the best option
@@ -182,7 +182,7 @@ test_nonbuild() {
 
 test_build() {
     #   Unless arguments are passed in to test specific base images, all
-    #   base images known to dent and viable on this platform are tested.
+    #   base images known to Dent and viable on this platform are tested.
     header 'Builds from base images'
 
     #   Certain very old images don't work on very new kernels.

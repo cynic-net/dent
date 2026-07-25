@@ -1,7 +1,7 @@
-`dent`: Create and Enter Docker Containers
-==========================================
+Dent: Create and Enter Docker Containers
+========================================
 
-`dent` ("Docker ENTer") starts a new process (by default an interactive
+Dent ("Docker ENTer") starts a new process (by default an interactive
 command line) running as you (not `root`) in a Docker container, if
 necessary creating the container and even an image with your $HOME etc. all
 set up.
@@ -26,18 +26,18 @@ this are useful for:
   have a tendency to reach out and do things to your system (even via sudo)
   and other systems if they find your keys.
 
-Images and containers are created as necessary. When `dent` creates a
+Images and containers are created as necessary. When Dent creates a
 new image from a base image it will add:
 - A Unix account with the current user's UID and login name.
 - A few important basic packages and some configuration for
   interactive use (see below).
 - The latest updates for of all packages.
 
-Images created by `dent` include only a minimal set of the most
+Images created by Dent include only a minimal set of the most
 essential packages (UTF-8 locales, sudo, etc.), those without which
 it's fairly inconvenient to install further packages or do very basic
 work. If you frequently need more than this, you should use other
-systems for further configuring hosts. (`dent` is of course excellent
+systems for further configuring hosts. (Dent is of course excellent
 help with testing these.)
 
 The following further documentation is available:
@@ -50,7 +50,7 @@ The following further documentation is available:
 Installation
 ------------
 
-`dent` is can be installed from [PyPI][pi-dent], or intalled or cloned from
+Dent can be installed from [PyPI][pi-dent], or intalled or cloned from
 [GitHub][gh-dent].
 
 Basic install:

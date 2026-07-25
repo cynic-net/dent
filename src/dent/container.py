@@ -60,7 +60,7 @@ def enter_container(conf:Config):
     #   WARNING: The command below must NOT copy $XDG_STATE_DIR or $HOME
     #   into the container. The container was set up with a specifc
     #   $XDG_STATE_HOME (or default $HOME/.local/state) and mounted the
-    #   dent share based on that: different values will silently disable
+    #   Dent share based on that: different values will silently disable
     #   the entry script as $HOME/.local/bin/dent-share will no longer
     #   be able to find it.
 
@@ -76,7 +76,7 @@ def enter_container(conf:Config):
     if stdin.isatty():
         command.append('-t')
     command.append(conf.CONTAINER_NAME)
-    #   Containers created with the dent share are entered via a launcher
+    #   Containers created with the Dent share are entered via a launcher
     #   that sources a per-entry startup file then execs the requested
     #   command; the `[ -f ]` guard tolerates a missing file. Others are
     #   entered directly.
@@ -90,9 +90,9 @@ def enter_container(conf:Config):
         #      shared into the container.)
         #   2. If it's present, sources it with the `.` command.
         #   3. exec's "$@", which will be conf.COMMAND, either the remaining
-        #      arguments given on the dent command line or the dent's
-        #      default `bash -l`. (XXX this really should be the user's shell,
-        #      not hardcoded to bash.)
+        #      arguments given on the `dent` command line or Dent's default
+        #      `bash -l`. (XXX this really should be the user's shell, not
+        #      hardcoded to bash.)
         cont_sh_c = f'[ -f "{contfile}" ] && ls -l {contfile} ' \
             f' && eval "$({contfile} cat-entry-script {esfname})"; exec "$@"'
         command += ['sh', '-c', cont_sh_c, 'argv0'] + conf.COMMAND
@@ -141,7 +141,7 @@ STARTUP_KEEP    = 12
 STARTUP_MIN_AGE = 120
 
 def dent_share(conf:Config) -> Path:
-    ''' For images/containers created by dent, we create a *dent share*: a
+    ''' For images/containers created by Dent, we create a *Dent share*: a
         directory used to pass information back and forth (entry
         initialisation code, copy/paste stuff, sockets, and anything the user
         wants to share). It is bind-mounted at the same path in host and
@@ -188,7 +188,7 @@ def startup_file_text(conf:Config, now:datetime, environ=None) -> str:
 
     nows = now.isoformat(timespec='seconds')
     head = dedent(f'''
-        #   dent entry {nows}  container={conf.CONTAINER_NAME}  host-pid={os.getpid()}
+        #   Dent entry {nows}  container={conf.CONTAINER_NAME}  host-pid={os.getpid()}
         #   host cwd: {cwd}
         #   argv: {argv}
         command cd {Q(cwd)} 2>/dev/null || true
@@ -234,7 +234,7 @@ def create_container(conf:Config):
 
     #   Pass the host's XDG_* vars through at creation (not on entry) so the
     #   container's XDG layout — in particular XDG_STATE_HOME, which locates
-    #   the dent share ??? matches the host's. `docker exec` inherits these.
+    #   the Dent share — matches the host's. `docker exec` inherits these.
     xdg_env = tuple('--env=' + k
         for k in sorted(os.environ) if k.startswith('XDG_'))
 

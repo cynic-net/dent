@@ -1,5 +1,5 @@
-`dent` Operation
-================
+Dent Operation
+==============
 
 Contents:
 - Use of Docker
@@ -11,16 +11,16 @@ Contents:
 Use of Docker
 -------------
 
-`dent` calls the `docker` command (which must be in the path) for
+Dent calls the `docker` command (which must be in the path) for
 all communications with the Docker daemon. Security-minded admins will
 not put users into the `docker` group (because this is a less-obvious
 way of [giving them full root access][root] on the Docker host) but
 instead make users' access explicit by allowing them to `sudo` to
-root. `dent` handles this by running `sudo docker` instead of `docker`
+root. Dent handles this by running `sudo docker` instead of `docker`
 if it detects that the current user doesn't have access to the Docker
 daemon's socket.
 
-`dent` uses the `docker` command for all interaction with the Docker
+Dent uses the `docker` command for all interaction with the Docker
 daemon. Certain operations are more easily done with the Python Docker
 API, but others are not and adding a dependency on the [Docker SDK for
 Python][py-docker] only to write significantly more code didn't seem
@@ -30,38 +30,38 @@ worthwhile.
 Operation Overview
 ------------------
 
-Roughly, `dent` does the following when you try to enter a container:
+Roughly, Dent does the following when you try to enter a container:
 1. If the container exists, and is running, it runs (with `docker exec`)
    the command you give it (default `bash -l` ) in the container. Note that
-   the container need not have been created by `dent`.
+   the container need not have been created by Dent.
 2. If the container is not running, it is started (`docker start`) and then
    the above step is performed.
 3. If the container does not exist, it creates a fresh container from a
    default image or an image you specify with the `-i` option. Again, this
-   image need not have been created by `dent`. The container will be
+   image need not have been created by Dent. The container will be
    started with a placeholder process that never exits (`tail -f
-   /dev/null`); any use of the container is done by dent calling `docker
+   /dev/null`); any use of the container is done by Dent calling `docker
    exec`, per the steps above.
-4. If the image does not exist, `dent` creates an image with, in addition
+4. If the image does not exist, Dent creates an image with, in addition
    to the standard root account, a user account with the same UID as is
    being used on the host. Various other setup is done and the container is
    started and entered per the steps above.
 
-When dent creates a container, it always creates a 'dent share' directory
+When Dent creates a container, it always creates a 'Dent share' directory
 shared read/write between the host and the container. (This is in addition
 to any shares specified with `-s` or `-S`.) This is used for communication
 between the host and the container. The `dent-share` script and
 `$DENT_CONTAINER` enviroment variable can be used to find the location of
-the dent share.
+the Dent share.
 
 
 Operation Details
 -----------------
 
-The end result achieved by `dent` is to run a command (by default, a
+The end result achieved by Dent is to run a command (by default, a
 login shell) as a new process in a running container. There are
 several other things that must have already been done before this can
-happen; these dependencies are described here in reverse order. `dent`
+happen; these dependencies are described here in reverse order. Dent
 does not know or care whether dependent steps (e.g., ensuring a
 container or image exists) were done by itself or via other means such
 as manual `docker` commands run by the user.
@@ -76,7 +76,7 @@ as manual `docker` commands run by the user.
    in the container at the same time.
 
    Dent changes `docker exec`'s detach key sequence (which you normally
-   would not use when using dent) from the default of `ctrl-p,ctrl-q` to
+   would not use when using Dent) from the default of `ctrl-p,ctrl-q` to
    `ctrl-@,ctrl-d`. This avoids the annoying "hold" of `ctrl-p` until
    another character is typed. This currently cannot be overridden.
 
@@ -115,9 +115,9 @@ as manual `docker` commands run by the user.
    The name of the image is specified with `-i IMAGE`; if that is not
    supplied a default name and tag is generated based on the base
    image name given to `-B BASE_IMAGE` and the login name of the user
-   running `dent`. (The image tag may be overridden with `-t TAG`.) If
+   running Dent. (The image tag may be overridden with `-t TAG`.) If
    an image with that name does not exist, one will be built with a
-   configuration designed for interactive use as the user running `dent`.
+   configuration designed for interactive use as the user running Dent.
 
    If the given image does exist, the `-R` or `--force-rebuild` flag can
    be used to untag that image and do a full image build, ignoring any
@@ -125,9 +125,9 @@ as manual `docker` commands run by the user.
    any containers exist that were created from it; that image can be
    removed with `docker image prune` after removing those containers.
 
-   For the full details of how `dent` builds and sets up the image,
+   For the full details of how Dent builds and sets up the image,
    see the `DOCKERFILE` and the setup script `SETUP_IMAGE` in the
-   `dent` source code. Here we briefly describe its general function.
+   Dent source code. Here we briefly describe its general function.
 
    1. __Package setup.__ The base image is assumed to have `apt` or `yum`
       available and be configured to connect to a source of packages
@@ -139,12 +139,12 @@ as manual `docker` commands run by the user.
         curl, vim, git, etc.
 
    2. __User setup.__ A user will be created (using `useradd`) with the same
-      name, uid and groups as the user running `dent`. Sudo will be
+      name, uid and groups as the user running Dent. Sudo will be
       configured to let this user sudo to root without using a password.
       The image's default user and working directory will be configured
       to this user and her home directory.
 
-   `dent` is not designed to be able to build the above image from any
+   Dent is not designed to be able to build the above image from any
    type of base image. If you have a base image that doesn't work with
    the setup script, it's probably best just to build by hand an
    appropriate image for creating containers and use it with the `-i
@@ -155,7 +155,7 @@ as manual `docker` commands run by the user.
 'Dent Share' Communications Mechanism
 -------------------------------------
 
-When dent creates a container, it always creates a _dent share_ directory
+When Dent creates a container, it always creates a _Dent share_ directory
 which is a read/write bind mount between the host and the container. (This
 is in addition to any shares specified with `-s` or `-S`.) This is used for
 communication between the host and the container.
@@ -163,14 +163,14 @@ communication between the host and the container.
 The directories have the same names as their containers and are stored
 under `${XDG_STATE_DIR}/dent/`. (This defaults to `$HOME/.local/state/dent`
 if $XDG_STATE_DIR is not set.) This path can be printed by running
-`dent-share dir` (the `dent-share` script included with `dent`). If given a
+`dent-share dir` (the `dent-share` script included with Dent). If given a
 second argument after the subcommand, that will be considered a container
 name and appended to the printed path, e.g., `ls -lt "$(dent-share dir
 somecont)/entry-script/"`. Within a container you can use the
 `$DENT_CONTAINER` environment variable to determine your container name.
 
 The system is used mainly for an _entry script_ that does initial setup of
-the environment when `dent` enters a container. This includes changing the
+the environment when Dent enters a container. This includes changing the
 container's current working directory to be the same as it was on the host,
 if that directory exists in the container. The exact environment and
 execution of the script can be confirmed by looking at the most recent file

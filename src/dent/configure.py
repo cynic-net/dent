@@ -13,7 +13,7 @@ PrintFileName = Literal['dockerfile', 'setup-pkg', 'setup-user']
 
 ####################################################################
 #   Commands: requests that main() do something entirely different
-#   from the standard dent container entry (which is specified by a
+#   from the standard Dent container entry (which is specified by a
 #   Config, below).
 
 @dataclass(frozen=True)
@@ -145,7 +145,7 @@ def parseargs(argv:list[str]|None=None) -> Command|Config:
 
     #   `default=` does not work with nargs=REMAINDER. We cannot use
     #   nargs='*' because that will cause options in the remainder to be
-    #   interpreted as dent options unless the user adds `--` between,
+    #   interpreted as Dent options unless the user adds `--` between,
     #   which is inconvenient.
     if not ns.COMMAND: ns.COMMAND = ['bash', '-l']
 

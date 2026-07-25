@@ -1,5 +1,5 @@
-`dent` Testing and Development
-==============================
+Dent Testing and Development
+============================
 
 `Test` starts by sourcing `pactivate`, which builds a virtualenv using
 the first `python3` or `python` found in the path. If you wish to test
@@ -34,8 +34,8 @@ option may be given multiple times.)
   avoids running `docker` commands that change state (creating containers,
   etc.), instead printing the command lines, but it does need to run
   `docker` commands that check state.
-- `nonbuild`: Tests that check `dent` functionality outside of
-   building images (i.e., just creating, starting and entering containers).
+- `nonbuild`: Tests that check Dent functionality outside of building
+  images (i.e., just creating, starting and entering containers).
 - `build`: Tests that build images. Builds based on a default set of
    base images will be tested, but you can override this by specifying one
    or more specific image names using the `-B` option, e.g., `.Test -B

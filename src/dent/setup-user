@@ -3,8 +3,8 @@
 users_generic() {
     echo '-- Ensure UID 1000 does not exist'
     #   Ubuntu images (and perhaps others) have a pre-created user with
-    #   UID 1000; if the dent user is also using Ubuntu with a default
-    #   install, she will be UID 1000 as well and dent will not be able
+    #   UID 1000; if the Dent user is also using Ubuntu with a default
+    #   install, she will be UID 1000 as well and Dent will not be able
     #   to create that user in the container because it already exists.
     #   So make sure it doesn't.
     uname1000=$(id -un 1000) || true
@@ -94,7 +94,7 @@ dent_share_setup() {
     #   2. Create the paths leading to $(dent-share) so that they are
     #      owned by the user. (If `docker run` creates them, they will be
     #      owned by root.)
-    #   On container creation we will bind-mount the dent share in
+    #   On container creation we will bind-mount the Dent share in
     #   $(dent-share).
     sudo -u %{uname} -H bash -c '
         set -e

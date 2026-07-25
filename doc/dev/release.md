@@ -1,5 +1,5 @@
-How to Release `dent`
-=====================
+How to Release Dent
+===================
 
 Releases are done with the `build-release` script in [cynic-net/pypi-release].
 (You will need a local copy of this repo somewhere so you can run the script.)
