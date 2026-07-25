@@ -1,5 +1,62 @@
-Dent Operation Details
-======================
+`dent` Operation
+================
+
+Contents:
+- Use of Docker
+- Operation Overview
+- Operation Details
+- 'Dent Share' Communications Mechanism
+
+
+Use of Docker
+-------------
+
+`dent` calls the `docker` command (which must be in the path) for
+all communications with the Docker daemon. Security-minded admins will
+not put users into the `docker` group (because this is a less-obvious
+way of [giving them full root access][root] on the Docker host) but
+instead make users' access explicit by allowing them to `sudo` to
+root. `dent` handles this by running `sudo docker` instead of `docker`
+if it detects that the current user doesn't have access to the Docker
+daemon's socket.
+
+`dent` uses the `docker` command for all interaction with the Docker
+daemon. Certain operations are more easily done with the Python Docker
+API, but others are not and adding a dependency on the [Docker SDK for
+Python][py-docker] only to write significantly more code didn't seem
+worthwhile.
+
+
+Operation Overview
+------------------
+
+Roughly, `dent` does the following when you try to enter a container:
+1. If the container exists, and is running, it runs (with `docker exec`)
+   the command you give it (default `bash -l` ) in the container. Note that
+   the container need not have been created by `dent`.
+2. If the container is not running, it is started (`docker start`) and then
+   the above step is performed.
+3. If the container does not exist, it creates a fresh container from a
+   default image or an image you specify with the `-i` option. Again, this
+   image need not have been created by `dent`. The container will be
+   started with a placeholder process that never exits (`tail -f
+   /dev/null`); any use of the container is done by dent calling `docker
+   exec`, per the steps above.
+4. If the image does not exist, `dent` creates an image with, in addition
+   to the standard root account, a user account with the same UID as is
+   being used on the host. Various other setup is done and the container is
+   started and entered per the steps above.
+
+When dent creates a container, it always creates a 'dent share' directory
+shared read/write between the host and the container. (This is in addition
+to any shares specified with `-s` or `-S`.) This is used for communication
+between the host and the container. The `dent-share` script and
+`$DENT_CONTAINER` enviroment variable can be used to find the location of
+the dent share.
+
+
+Operation Details
+-----------------
 
 The end result achieved by `dent` is to run a command (by default, a
 login shell) as a new process in a running container. There are
@@ -94,7 +151,9 @@ as manual `docker` commands run by the user.
    IMAGE` option. (Ideas for making the setup script more general are
    welcome.)
 
-### 'Dent Share' Communications Mechanism
+
+'Dent Share' Communications Mechanism
+-------------------------------------
 
 When dent creates a container, it always creates a _dent share_ directory
 which is a read/write bind mount between the host and the container. (This
@@ -118,3 +177,9 @@ execution of the script can be confirmed by looking at the most recent file
 in `"$(dent-share-dir $DENT_CONTAINER)/entry-script/"`; the last few of
 these are kept around for debugging purposes. (For more on exactly how
 those are written, see `dent.container.write_startup_file()`.)
+
+
+
+<!-------------------------------------------------------------------->
+[py-docker]: https://pypi.org/project/docker/
+[root]: https://github.com/0cjs/sedoc/blob/master/docker/security.md#leveraging-docker-for-root-access
