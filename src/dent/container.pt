@@ -1,8 +1,43 @@
 from    dent.configure  import Config
-from    dent.container  import share_args, startup_file_text
+from    dent.container  import has_bind, share_args, startup_file_text
 
 from    datetime import datetime
 from    pathlib  import Path
+import  json, pytest
+
+SHARE = '/home/x/.local/state/dent/Xcname'
+
+def mount(src, dst, ty='bind'):
+    ' A Mounts entry as found in `docker inspect` container output. '
+    return { 'Type':ty, 'Source':src, 'Destination':dst, 'RW':True }
+
+@pytest.mark.parametrize('_id, expected, inspect', [
+    ('no-mounts-key',   False, {}),
+    ('null-mounts',     False, { 'Mounts': None }),
+    ('empty-mounts',    False, { 'Mounts': [] }),
+    ('other-source',    False, { 'Mounts': [mount('/other', '/other')] }),
+    #   What identifies a bind is the host-side Source; the in-container
+    #   path may differ (e.g. the Dent share in older containers, which
+    #   the dent-share script handles itself).
+    ('same-dest',       True,  { 'Mounts': [mount(SHARE, SHARE)] }),
+    ('old-dest',        True,  { 'Mounts': [mount(SHARE, '/old/path')] }),
+    #   A foreign mount at the sought path's usual destination is no bind.
+    ('foreign-at-dest', False, { 'Mounts': [mount('/foreign', SHARE)] }),
+    #   Non-bind mounts don't count, whatever their Source.
+    ('volume-not-bind', False, { 'Mounts': [mount(SHARE, SHARE, 'volume')] }),
+])
+def test_has_bind_unit(_id, expected, inspect):
+    assert expected is has_bind(inspect, source=Path(SHARE))
+
+@pytest.mark.parametrize('expected, path', [
+    (True,  '/home/alice/.local/state/dent/deb13'),
+    (False, '/home/alice/OLD/dent/deb13'),
+    (False, '/home/alice/notbind'),
+])
+def test_has_bind_realdata(expected, path):
+    ' Tests with actual `docker container inspect` output. '
+    assert expected \
+        is has_bind(DOCKER_CONTAINER_INSPECT_FULL, source=Path(path))
 
 def test_share_args():
     home = str(Path.home())
@@ -24,3 +59,250 @@ def test_startup_file_text():
     assert 'NOCOPY' not in s
     assert 'EXISTS=one' in s
     assert '''   X='"'"'"'"'   '''.strip() in s
+
+####################################################################
+#   A full sample inspect output taken (mostly) directly from
+#   Docker, to confirm that our mock versions of the format match
+#   the real thing.
+
+DOCKER_CONTAINER_INSPECT_FULL_STR = '''\
+[
+    {
+        "Id": "a699541e19c29426ee5e60c8bde0902bbcd836483c4e16108381720cc9f134b7",
+        "Created": "2026-07-24T04:06:40.400259201Z",
+        "Path": "tail",
+        "Args": [
+            "-f",
+            "/dev/null"
+        ],
+        "State": {
+            "Status": "running",
+            "Running": true,
+            "Paused": false,
+            "Restarting": false,
+            "OOMKilled": false,
+            "Dead": false,
+            "Pid": 164525,
+            "ExitCode": 0,
+            "Error": "",
+            "StartedAt": "2026-07-24T04:06:40.449255706Z",
+            "FinishedAt": "0001-01-01T00:00:00Z"
+        },
+        "Image": "sha256:a24c20dfb7cbacfef6884dafd752a8625f8e18d8b61341b598ed5acef760e2ca",
+        "ResolvConfPath": "/var/lib/docker/containers/a699541e19c29426ee5e60c8bde0902bbcd836483c4e16108381720cc9f134b7/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/a699541e19c29426ee5e60c8bde0902bbcd836483c4e16108381720cc9f134b7/hostname",
+        "HostsPath": "/var/lib/docker/containers/a699541e19c29426ee5e60c8bde0902bbcd836483c4e16108381720cc9f134b7/hosts",
+        "LogPath": "/var/lib/docker/containers/a699541e19c29426ee5e60c8bde0902bbcd836483c4e16108381720cc9f134b7/a699541e19c29426ee5e60c8bde0902bbcd836483c4e16108381720cc9f134b7-json.log",
+        "Name": "/deb13",
+        "RestartCount": 0,
+        "Driver": "overlay2",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "docker-default",
+        "ExecIDs": [
+            "eafd9d973353923924538b752a50a650db213d966f5c26803539fea246c90312",
+            "ba01a36099dc7b895b22631e6f2f1294f76bd74fd557d93b9bad4b5a124113fc",
+            "7903d8fbfac5cd0a4ad13edf5ce53bd16fc38d2b4d6207b36ca6f8c2e9fdd5dc",
+            "6a68b033ac7dda8e0c71df6b76a9b80e0a201ab8146241146f2b9ab92b1b9d59"
+        ],
+        "HostConfig": {
+            "Binds": [
+                "/home/alice/co/public:/home/alice/co/public:ro",
+                "/home/alice/.local/state/dent/deb13:/home/alice/OLD/dent/deb13"
+            ],
+            "ContainerIDFile": "",
+            "LogConfig": {
+                "Type": "json-file",
+                "Config": {}
+            },
+            "NetworkMode": "bridge",
+            "PortBindings": {},
+            "RestartPolicy": {
+                "Name": "no",
+                "MaximumRetryCount": 0
+            },
+            "AutoRemove": false,
+            "VolumeDriver": "",
+            "VolumesFrom": null,
+            "ConsoleSize": [
+                0,
+                0
+            ],
+            "CapAdd": null,
+            "CapDrop": null,
+            "CgroupnsMode": "private",
+            "Dns": null,
+            "DnsOptions": [],
+            "DnsSearch": [],
+            "ExtraHosts": null,
+            "GroupAdd": null,
+            "IpcMode": "private",
+            "Cgroup": "",
+            "Links": null,
+            "OomScoreAdj": 0,
+            "PidMode": "",
+            "Privileged": false,
+            "PublishAllPorts": false,
+            "ReadonlyRootfs": false,
+            "SecurityOpt": null,
+            "UTSMode": "",
+            "UsernsMode": "",
+            "ShmSize": 67108864,
+            "Runtime": "runc",
+            "Isolation": "",
+            "CpuShares": 0,
+            "Memory": 0,
+            "NanoCpus": 0,
+            "CgroupParent": "",
+            "BlkioWeight": 0,
+            "BlkioWeightDevice": [],
+            "BlkioDeviceReadBps": [],
+            "BlkioDeviceWriteBps": [],
+            "BlkioDeviceReadIOps": [],
+            "BlkioDeviceWriteIOps": [],
+            "CpuPeriod": 0,
+            "CpuQuota": 0,
+            "CpuRealtimePeriod": 0,
+            "CpuRealtimeRuntime": 0,
+            "CpusetCpus": "",
+            "CpusetMems": "",
+            "Devices": [],
+            "DeviceCgroupRules": null,
+            "DeviceRequests": null,
+            "MemoryReservation": 0,
+            "MemorySwap": 0,
+            "MemorySwappiness": null,
+            "OomKillDisable": null,
+            "PidsLimit": null,
+            "Ulimits": [],
+            "CpuCount": 0,
+            "CpuPercent": 0,
+            "IOMaximumIOps": 0,
+            "IOMaximumBandwidth": 0,
+            "MaskedPaths": [
+                "/proc/acpi",
+                "/proc/asound",
+                "/proc/interrupts",
+                "/proc/kcore",
+                "/proc/keys",
+                "/proc/latency_stats",
+                "/proc/sched_debug",
+                "/proc/scsi",
+                "/proc/timer_list",
+                "/proc/timer_stats",
+                "/sys/devices/virtual/powercap",
+                "/sys/firmware"
+            ],
+            "ReadonlyPaths": [
+                "/proc/bus",
+                "/proc/fs",
+                "/proc/irq",
+                "/proc/sys",
+                "/proc/sysrq-trigger"
+            ]
+        },
+        "GraphDriver": {
+            "Data": {
+                "ID": "a699541e19c29426ee5e60c8bde0902bbcd836483c4e16108381720cc9f134b7",
+                "LowerDir": "/var/lib/docker/overlay2/91cfea6257a8cac16e406ae695c806bfe56bcb29f2ffbf0d50167172904993a1-init/diff:/var/lib/docker/overlay2/aqulyl3tyf03fcqa5ai0olsvj/diff:/var/lib/docker/overlay2/8r2tj03npqxrd76el7ezo8vyp/diff:/var/lib/docker/overlay2/u4t0a1fdofd2u8911wbhezpdk/diff:/var/lib/docker/overlay2/ys91smpy8onse6x7hbfftkr0t/diff:/var/lib/docker/overlay2/y0vkutyl5tfctwwohjuuu98fp/diff:/var/lib/docker/overlay2/joxu6uxykvrv8oubhieslsizj/diff:/var/lib/docker/overlay2/6x7eb84ofqiazv7r3kfggqiea/diff:/var/lib/docker/overlay2/b277b072626e47138089859263281b25bcfd1463be060752ca8d1ac925000572/diff",
+                "MergedDir": "/var/lib/docker/overlay2/91cfea6257a8cac16e406ae695c806bfe56bcb29f2ffbf0d50167172904993a1/merged",
+                "UpperDir": "/var/lib/docker/overlay2/91cfea6257a8cac16e406ae695c806bfe56bcb29f2ffbf0d50167172904993a1/diff",
+                "WorkDir": "/var/lib/docker/overlay2/91cfea6257a8cac16e406ae695c806bfe56bcb29f2ffbf0d50167172904993a1/work"
+            },
+            "Name": "overlay2"
+        },
+        "Mounts": [
+            {
+                "Type": "bind",
+                "Source": "/home/alice/co/public",
+                "Destination": "/home/alice/co/public",
+                "Mode": "ro",
+                "RW": false,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/home/alice/.local/state/dent/deb13",
+                "Destination": "/home/alice/OLD/dent/deb13",
+                "Mode": "",
+                "RW": true,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "notbind",
+                "Source": "/home/alice/notbind",
+                "Destination": "/home/alice/OLD/notbind",
+                "Mode": "rw",
+                "RW": true,
+                "Propagation": "rprivate"
+            }
+        ],
+        "Config": {
+            "Hostname": "deb13",
+            "Domainname": "",
+            "User": "alice",
+            "AttachStdin": false,
+            "AttachStdout": false,
+            "AttachStderr": false,
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "DENT_CONTAINER=deb13",
+                "XDG_RUNTIME_DIR",
+                "XDG_SESSION_CLASS",
+                "XDG_SESSION_ID",
+                "XDG_SESSION_DESKTOP",
+                "XDG_SESSION_PATH",
+                "XDG_VTNR",
+                "TERM=xterm-256color",
+                "LOGNAME=alice",
+                "USER=alice",
+                "XDG_SEAT",
+                "XDG_SEAT_PATH",
+                "HOST_HOSTNAME=ihnp4",
+                "XDG_CURRENT_DESKTOP=XFCE",
+                "XDG_GREETER_DATA_DIR",
+                "XDG_SESSION_TYPE",
+                "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+            ],
+            "Cmd": [
+                "tail",
+                "-f",
+                "/dev/null"
+            ],
+            "Image": "dent/debian.13:alice",
+            "Volumes": null,
+            "WorkingDir": "/home/alice",
+            "Entrypoint": null,
+            "Labels": {}
+        },
+        "NetworkSettings": {
+            "SandboxID": "a95c1030abe44c309f8956f122e6ef902f127fc0567b1fbef9e9545fd5f0094e",
+            "SandboxKey": "/var/run/docker/netns/a95c1030abe4",
+            "Ports": {},
+            "Networks": {
+                "bridge": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": null,
+                    "DriverOpts": null,
+                    "GwPriority": 0,
+                    "NetworkID": "eec9983f52855c2210c3d7d7e4af2fc730c1826fb487e76363c37df154c7af26",
+                    "EndpointID": "d995448fe3475b5027849796c112e218ce46a35f4c4b4464f5323d2cb1a7dff7",
+                    "Gateway": "172.17.0.1",
+                    "IPAddress": "172.17.0.2",
+                    "MacAddress": "ff:ee:dd:cc:bb:aa",
+                    "IPPrefixLen": 16,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "DNSNames": null
+                }
+            }
+        }
+    }
+]
+'''
+DOCKER_CONTAINER_INSPECT_FULL = json.loads(DOCKER_CONTAINER_INSPECT_FULL_STR)[0]

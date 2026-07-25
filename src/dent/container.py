@@ -49,11 +49,11 @@ def enter_container(conf:Config):
         if not container['State']['Running']:
             docker.docker_container_start(conf)
         #   Only containers created with the shared dir get the startup-file
-        #   launcher; a foreign container (possibly without bash) is entered
-        #   directly. Read from the inspect data we already have; no extra
-        #   docker call.
-        has_share = any( m.get('Destination') == str(dent_share(conf))
-                         for m in (container.get('Mounts') or []) )
+        #   launcher; a foreign container (possibly without even bash) is
+        #   entered directly. The Dent share is identified by the ``Source``
+        #   path (i.e. path on the host); the in-container path is taken
+        #   care of by the in-container ``dent-share dir`` program.
+        has_share = has_bind(container, source=dent_share(conf))
 
     waitforstart(conf)
 
@@ -156,6 +156,15 @@ def dent_share(conf:Config) -> Path:
     '''
     state = os.environ.get('XDG_STATE_HOME') or Path.home()/'.local'/'state'
     return Path(state) / 'dent' / conf.CONTAINER_NAME
+
+def has_bind(inspect:dict, *, source:Path) -> bool:
+    ''' Given the parsed ``docker inspect`` output for a container, return
+        `True` if the container binds `source` on the host side into the
+        container. (We don't check where in the container it is mounted.)
+    '''
+    #   Note that the ``Mounts`` entry may be absent or null.
+    return any( m.get('Source') == str(source) and m.get('Type') == 'bind'
+                for m in (inspect.get('Mounts') or []) )
 
 def write_entry_script(conf:Config) -> str:
     ''' At each entry write a startup script to be executed inside the
