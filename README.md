@@ -1,9 +1,10 @@
 `dent`: Create and Enter Docker Containers
 ==========================================
 
-`dent` ("Docker ENTer") starts a new process (by default an
-interactive command line) in a Docker container, creating the
-container and even an image if necessary.
+`dent` ("Docker ENTer") starts a new process (by default an interactive
+command line) running as you (not `root`) in a Docker container, if
+necessary creating the container and even an image with your $HOME etc. all
+set up.
 
 One use of this is simply to start one or more command lines (or run
 commands) in an existing container or a new container based on an
@@ -21,6 +22,9 @@ this are useful for:
   similar programs, where you don't want others to have access to
   files in your account, SSH keys in agents, and possibly root access
   to your host.
+- Providing a sandboxed environment for agents such as Claude Code that
+  have a tendency to reach out and do things to your system (even via sudo)
+  and other systems if they find your keys.
 
 Images and containers are created as necessary. When `dent` creates a
 new image from a base image it will add:
