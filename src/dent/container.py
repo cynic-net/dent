@@ -10,7 +10,7 @@ import  os, shlex, time
 
 from    dent  import docker, image
 from    dent.configure  import Config
-from    dent.util  import PWENT, die, qprint
+from    dent.util  import PWENT, die, qprint, warn
 
 ####################################################################
 #   Container entry.
@@ -21,23 +21,17 @@ def enter_container(conf:Config):
 
     #   Any arguments that modify the `docker run` command are not
     #   compatible with existing containers where `docker run` has
-    #   already been executed.
-    #
-    #   XXX This wants to move into configure.py. And also once we have
-    #   configuration files, we need to allow config specification of
-    #   e.g. base_image even for existing containers, and know that we
-    #   don't need to rebuild if base_image is the same now as when it
-    #   was when it was built. (Otherwise query user about rebuild?)
-    #
+    #   already been executed. Shares are compared against the existing
+    #   container's mounts and warn on mismatch; for the rest (XXX until
+    #   we implement further inspect comparisons, e.g. base_image via
+    #   image layer checks) we simply refuse.
     not_on_existing = (
            (conf.base_image is not None)
         or (conf.image is not None)
         or (len(conf.run_opt) > 0)
-        or (len(conf.share_ro) > 0)
-        or (len(conf.share_rw) > 0)
         )
     not_on_existing_msg \
-        = '-B, -i, -r and -s options cannot affect existing containers'
+        = '-B, -i and -r options cannot affect existing containers'
 
     container = docker.docker_inspect('container', conf.CONTAINER_NAME)
     if container is None:
@@ -46,6 +40,8 @@ def enter_container(conf:Config):
     else:   # container exists (but might not be started yet)
         if not_on_existing:
             die(not_on_existing_msg)
+        share = dent_share(conf)
+        for m in conf.container_mismatches(container, share):  warn(m)
         if not container['State']['Running']:
             docker.docker_container_start(conf)
         #   Only containers created with the shared dir get the startup-file
@@ -53,7 +49,7 @@ def enter_container(conf:Config):
         #   entered directly. The Dent share is identified by the ``Source``
         #   path (i.e. path on the host); the in-container path is taken
         #   care of by the in-container ``dent-share dir`` program.
-        has_share = has_bind(container, source=dent_share(conf))
+        has_share = has_bind(container, source=share)
 
     waitforstart(conf)
 
@@ -234,8 +230,8 @@ def create_container(conf:Config):
         avoid overflowing any old 32-bit systems) and run our actual
         commands or shells with ``docker exec`` in that existing container.
     '''
-    shared_path_opts \
-        = share_args(conf.share_ro, 'ro') + share_args(conf.share_rw, 'rw')
+    shared_path_opts = [ '-v={0}:{0}:{1}'.format(p, 'rw' if rw else 'ro')
+                         for p, rw in conf.share_paths() ]
 
     share = dent_share(conf)
     (share / 'entry-script').mkdir(parents=True, exist_ok=True)
@@ -274,15 +270,3 @@ def create_container(conf:Config):
     if retcode != 0:
         die('Failed to create container {} with command:\n{}' \
             .format(conf.CONTAINER_NAME, ' '.join(command)))
-
-def share_args(args, opt):
-    ''' Given an iterable of paths, return a list of ``-v`` options for
-        ``docker run`` that will mount them at the same path in the
-        container. Relative paths are taken as relative to ``$HOME`` and
-        converted to absolute paths.
-    '''
-    vs = []
-    for s in args:
-        p = Path.home().joinpath(s)     # if relative, make absolute
-        vs += ['-v={}:{}:{}'.format(p, p, opt)]
-    return vs

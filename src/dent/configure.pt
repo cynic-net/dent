@@ -1,5 +1,6 @@
 from    dent.configure  import (
         Config, ListBaseImages, PrintFile, PrintVersion, parseargs)
+from    pathlib  import Path
 import  pytest
 
 def test_parseargs_config():
@@ -41,3 +42,93 @@ def test_parseargs_print_file():
     assert PrintFile('dockerfile', 'debian:12') \
         == parseargs(['-P', 'dockerfile', '-B', 'debian:12'])
     assert PrintFile('setup-pkg', None) == parseargs(['-P', 'setup-pkg'])
+
+####################################################################
+#   Config comparison against existing containers
+
+def test_share_paths():
+    home = Path.home()
+    conf = Config.testconfig(
+        share_ro=['/etc/foo', 'rel'], share_rw=['/home/bar'])
+    assert [    (Path('/etc/foo'), False),
+                (home/'rel',       False),
+                (Path('/home/bar'), True),
+           ] == conf.share_paths()
+
+def mount(p, rw):
+    ' A Mounts entry as found in `docker inspect` container output. '
+    return { 'Type':'bind', 'Source':str(p), 'Destination':str(p), 'RW':rw }
+
+#   The Dent share path passed to the comparison methods in these tests.
+DSHARE = Path('/home/x/.local/state/dent/Xcname')
+
+def test_container_mismatches_ok():
+    conf = Config.testconfig(share_ro=['/ro/dir'], share_rw=['/rw/dir'])
+    inspect = { 'Mounts': [
+        mount('/ro/dir', False), mount('/rw/dir', True), mount(DSHARE, True),
+        mount('/unrelated', True),      # extra mounts are not a mismatch
+        ]}
+    assert [] == conf.container_mismatches(inspect, DSHARE)
+
+def test_container_mismatches_bad():
+    conf = Config.testconfig(
+        share_ro=['/ro/dir', '/badsrc', '/volmnt'],
+        share_rw=['/rw/dir', '/absent'])
+    inspect = { 'Mounts': [
+        mount('/ro/dir', True),         # mounted, but rw instead of ro
+        dict(mount('/badsrc', False), Source='/elsewhere'),
+        dict(mount('/volmnt', False), Type='volume'),   # not a bind mount
+        mount('/rw/dir', True),         # correct
+        mount(DSHARE, True),
+        ]}                              # /absent not mounted at all
+    ms = conf.container_mismatches(inspect, DSHARE)
+    assert 4 == len(ms)
+    assert any('/ro/dir' in m and 'read-only' in m  for m in ms)
+    assert any('/badsrc' in m                       for m in ms)
+    assert any('/volmnt' in m                       for m in ms)
+    assert any('/absent' in m and 'read-write' in m for m in ms)
+
+def test_container_mismatches_dent_share():
+    #   Containers predating the share feature, and foreign containers,
+    #   lack the Dent share mount; this key feature's absence is warned.
+    #   Only the host-side Source and writability matter: an older
+    #   container may mount the share at a different path inside, which
+    #   the dent-share script knows how to handle.
+    conf = Config.testconfig()
+    def ms(mounts):  return conf.container_mismatches({'Mounts':mounts}, DSHARE)
+
+    missing = ms([ mount('/x', True) ])
+    assert 1 == len(missing)
+    assert 'Dent share' in missing[0]  and str(DSHARE) in missing[0]
+
+    assert [] == ms([ mount(DSHARE, True) ])
+    assert [] == ms([ dict(mount(DSHARE, True), Destination='/old/path') ])
+    assert 1 == len(ms([ mount(DSHARE, False) ]))       # ro is not enough
+    assert 1 == len(ms([ dict(mount(DSHARE, True), Type='volume') ]))
+
+def test_container_mismatches_no_mounts():
+    #   Foreign containers may have no Mounts entry, or one that is null.
+    conf = Config.testconfig(share_ro=['/x'])
+    assert 2 == len(conf.container_mismatches({ 'Mounts': None }, DSHARE))
+    assert 2 == len(conf.container_mismatches({}, DSHARE))
+
+def test_extra_mounts():
+    conf = Config.testconfig(share_ro=['/req/ro'], share_rw=['/req/rw'])
+    inspect = { 'Mounts': [
+        mount('/req/ro', False),                # requested: not extra
+        mount('/req/rw', False),                # wrong mode, but not extra
+        mount(DSHARE, True),                    # Dent share: not extra
+        mount('/extra/one', True),              # extra
+        mount('/extra/two', False),             # extra
+        dict(mount('/vol', True), Type='volume'),       # not share-shaped
+        dict(mount('/dst', True), Source='/src'),       # not share-shaped
+        ]}
+    ms = conf.extra_mounts(inspect, DSHARE)
+    assert 2 == len(ms)
+    assert any('/extra/one' in m and 'read-write' in m for m in ms)
+    assert any('/extra/two' in m and 'read-only'  in m for m in ms)
+
+def test_extra_mounts_none():
+    assert [] == Config.testconfig().extra_mounts({}, DSHARE)
+    assert [] == Config.testconfig().extra_mounts(
+        { 'Mounts': [mount(DSHARE, True)] }, DSHARE)

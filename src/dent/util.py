@@ -18,6 +18,9 @@ def qprint(quiet:bool, *args, force_print=False, **kwargs):
     if force_print or not quiet:
         print('-----', *args, **kwargs)
 
+def warn(msg):
+    print(PROGNAME + ': warning:', msg, file=stderr)
+
 def die(msg) -> NoReturn:
     print(PROGNAME + ':', msg, file=stderr)
     exit(1)
