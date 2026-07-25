@@ -5,6 +5,7 @@ from    dent.util import die
 from    argparse  import (
         ArgumentParser, REMAINDER, RawDescriptionHelpFormatter)
 from    dataclasses  import dataclass
+from    pathlib  import Path
 from    textwrap import dedent
 from    typing  import Literal, get_args
 
@@ -94,6 +95,83 @@ class Config:
             }
         return Config(**(defaults|kwargs))
 
+    def container_mismatches(self, inspect:dict, share:Path) -> list[str]:
+        ''' Return warnings describing how this container differs from the
+            configuration requested for this container. (These are normally
+            displayed as warnings, just to let you know you might want to
+            rebuild.)
+        '''
+        ms  = self.mount_mismatches(inspect, share)
+        #   XXX Enable these once we have config files to hold the options
+        #   that would suppress the messages; otherwise we have to write
+        #   the whole creation command line every time.
+        #ms += self.extra_mounts(inspect, share)
+        #ms += self.env_mismatches(inspect)
+        #ms += self.image_mismatches(...)
+        return ms
+
+    def mount_mismatches(self, inspect:dict, share:Path) -> list[str]:
+        ''' Warnings for configured shares that are not bind-mounted at the
+            same path in the container with the requested writability, and
+            for the Dent share when not mounted read-write from `share` on
+            the host.
+        '''
+        mounts = inspect.get('Mounts') or []
+        def mounted(p:Path, rw:bool) -> bool:
+            return any( dent_shared(m) and src_is(m, p) and rw_is(m, rw)
+                        for m in mounts )
+        ms = [ 'existing container does not mount {} {}'
+                    .format(p, 'read-write' if rw else 'read-only')
+                for p, rw in self.share_paths() if not mounted(p, rw) ]
+        #   For the Dent share only the host-side Source and writability
+        #   matter: the in-container path may differ in older containers,
+        #   which the dent-share script handles itself.
+        if not any( is_bind(m) and src_is(m, share) and rw_is(m, True)
+                    for m in mounts ):
+            ms.append('existing container does not mount the Dent share {}'
+                ' read-write'.format(share))
+        return ms
+
+    def extra_mounts(self, inspect:dict, share:Path) -> list[str]:
+        ''' Descriptions of mounts in the existing container described by
+            `inspect` that look like shares (bind mounts at the same path
+            inside and out) but are neither requested by this Config nor
+            the Dent share `share`. These tell the user the container does
+            *more* than the current invocation requests, typically due to
+            options given when it was created.
+
+            XXX These are not yet displayed to the user: until config
+            files land (supplying the full share list on every entry, and
+            allowing suppression for regularly-used foreign images) they
+            would nag on every entry that varies options from creation.
+        '''
+        requested = { str(p) for p, _ in self.share_paths() } | { str(share) }
+        return [ 'existing container also mounts {} {}'
+                    .format(m['Destination'],
+                        'read-write' if m.get('RW') else 'read-only')
+                 for m in (inspect.get('Mounts') or [])
+                 if dent_shared(m) and m.get('Destination') not in requested ]
+
+    def share_paths(self) -> list[tuple[Path,bool]]:
+        ''' Absolute paths of the `share_ro` and `share_rw` entries, each
+            paired with a writability flag. Relative paths are taken as
+            relative to `Path.home()`.
+        '''
+        home = Path.home()
+        return [ (home / s, False) for s in self.share_ro ] \
+             + [ (home / s, True)  for s in self.share_rw ]
+
+    def env_mismatches(self, inspect:dict):
+        ...
+
+    def image_mismatches(self):
+        ''' Check that the base-images's layers are a prefix of the
+            container's image's layers.
+        '''
+        #   To do this we need to inspect the base image and the
+        #   container's image (which ID we get from the container
+        #   inspection).
+
 ####################################################################
 #   Actions that tell the program what to do.
 
@@ -120,11 +198,13 @@ class Enter:
         what to do" format here, and Haskell's
         ``data Action = Entry Config | PrintVersion | …``.
     '''
-
     config      : Config
 
 Action = Enter | PrintVersion | ListBaseImages | PrintFile
 
+#   action()'s options must stay in sync with Config's fields:
+#   Config(**args) enforces the match at runtime. XXX To be truly
+#   generated from a directive table once config-file support lands.
 def action(argv:list[str]|None=None) -> Action:
     ''' Parse the command line, returning the `Action` it requests.
 
@@ -209,3 +289,29 @@ def action(argv:list[str]|None=None) -> Action:
     args = vars(ns)
     del args['version'], args['list_base_images'], args['print_file']
     return Enter(Config.from_args(**args))
+
+####################################################################
+#   Predicates used to compare configuration against inspect output.
+
+def is_bind(cont:dict) -> bool:
+    return cont.get('Type') == 'bind'
+
+def src_is(cont:dict, p:Path) -> bool:
+    return cont.get('Source') == str(p)
+
+def rw_is(cont:dict, rw:bool) -> bool:
+    ' A missing ``RW`` key is taken as read-only. '
+    return bool(cont.get('RW')) == rw
+
+def dent_shared(m:dict) -> bool:
+    ''' `m` looks as if it was shared via a Dent -s/-S option: it's
+        bind-mounted at the same path inside and outside the container.
+
+        >>> dent_shared({ 'Type':'bind', 'Source':'/a', 'Destination':'/a' })
+        True
+        >>> dent_shared({ 'Type':'volume', 'Source':'/a', 'Destination':'/a' })
+        False
+        >>> dent_shared({ 'Type':'bind', 'Source':'/a', 'Destination':'/b' })
+        False
+    '''
+    return is_bind(m) and m.get('Source') == m.get('Destination')

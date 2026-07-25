@@ -1,5 +1,5 @@
 from    dent.configure  import Config
-from    dent.container  import has_bind, share_args, startup_file_text
+from    dent.container  import has_bind, startup_file_text
 
 from    datetime import datetime
 from    pathlib  import Path
@@ -38,14 +38,6 @@ def test_has_bind_realdata(expected, path):
     ' Tests with actual `docker container inspect` output. '
     assert expected \
         is has_bind(DOCKER_CONTAINER_INSPECT_FULL, source=Path(path))
-
-def test_share_args():
-    home = str(Path.home())
-    ps = share_args(['/etc/foo', '/home/bar/baz', 'quux'], 'rw')
-    assert [    '-v=/etc/foo:/etc/foo:rw',
-                '-v=/home/bar/baz:/home/bar/baz:rw',
-               f'-v={home}/quux:{home}/quux:rw',
-           ] == ps
 
 def test_startup_file_text():
     conf = Config.testconfig(env_copy=['EXISTS', 'NOT_EXISTS', 'X'])
