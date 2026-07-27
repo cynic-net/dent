@@ -51,6 +51,7 @@ command_tmate() {
         | tail -1)
     [ -n "$token" ] || die 9 "Cannot find token!"
     local tmate_file=$(command_dir)/$TMATE_FILE
+    mkdir -p $(dirname "$tmate_file"); >>"$tmate_file"  # ensure exists for sed
     #   sed in place doesn't work on Mac! Does dent-share dir?
     #   This re-orders the tmate file and always puts the most recently
     #   added last. We live with this for the moment, maybe forever.
