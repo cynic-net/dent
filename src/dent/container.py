@@ -93,7 +93,7 @@ def enter_container(conf:Config):
         #      arguments given on the `dent` command line or Dent's default
         #      `bash -l`. (XXX this really should be the user's shell, not
         #      hardcoded to bash.)
-        cont_sh_c = f'[ -f "{contfile}" ] && ls -l {contfile} ' \
+        cont_sh_c = f'[ -f "{contfile}" ]' \
             f' && eval "$({contfile} cat-entry-script {esfname})"; exec "$@"'
         command += ['sh', '-c', cont_sh_c, 'argv0'] + conf.COMMAND
     else:
