@@ -67,6 +67,7 @@ class Config:
     progress        : bool
     quiet           : bool
     run_opt         : list[str]
+    set_env         : dict[str,str]
     share_ro        : list[str]
     share_rw        : list[str]
     tag             : str|None
@@ -77,8 +78,8 @@ class Config:
         defaults:dict = { 'CONTAINER_NAME':'Xcname', 'COMMAND':[],
             'base_image':None, 'dry_run':False, 'env_copy':[],
             'force_rebuild':False, 'image':None, 'keep_tmpdir':False,
-            'progress':False, 'quiet':False, 'run_opt':[], 'share_ro':[],
-            'share_rw':[], 'tag':None, 'tmpdir':None,
+            'progress':False, 'quiet':False, 'run_opt':[], 'set_env':{},
+            'share_ro':[], 'share_rw':[], 'tag':None, 'tmpdir':None,
             }
         return Config(**(defaults|kwargs))
 
@@ -89,11 +90,12 @@ class Config:
             rebuild.)
         '''
         ms  = self.mount_mismatches(inspect, share)
+        ms += self.env_mismatches(inspect)
         #   XXX Enable these once we have config files to hold the options
         #   that would suppress the messages; otherwise we have to write
         #   the whole creation command line every time.
         #ms += self.extra_mounts(inspect, share)
-        #ms += self.env_mismatches(inspect)
+        #ms += self.extra_env(...)
         #ms += self.image_mismatches(...)
         return ms
 
@@ -118,6 +120,19 @@ class Config:
             ms.append('existing container does not mount the Dent share {}'
                 ' read-write'.format(share))
         return ms
+
+    def env_mismatches(self, inspect:dict) -> list[str]:
+        ''' Warnings for configured environment variables (`set_env`) that
+            the existing container described by the ``docker inspect``
+            output `inspect` was not created with, per its ``Config.Env``.
+        '''
+        env = { k: v for k, v in
+                ( kv.split('=', 1)
+                  for kv in (inspect.get('Config') or {}).get('Env') or []
+                  if '=' in kv ) }
+        return [ 'existing container does not set {}={}'.format(k, v)
+                 for k, v in sorted(self.set_env.items())
+                 if env.get(k) != v ]
 
     def extra_mounts(self, inspect:dict, share:Path) -> list[str]:
         ''' Descriptions of mounts in the existing container described by
@@ -148,8 +163,17 @@ class Config:
         return [ (home / s, False) for s in self.share_ro ] \
              + [ (home / s, True)  for s in self.share_rw ]
 
-    def env_mismatches(self, inspect:dict):
-        ...
+    def extra_env(self):
+        ''' Warnings for environment variables the existing container was
+            created with but that this configuration does not request.
+        '''
+        #   Unlike extra_mounts(), where shares are recognizable by shape,
+        #   the container's Config.Env does not distinguish user-requested
+        #   variables from the image's own ENV and those Dent itself sets
+        #   at creation (DENT_CONTAINER, LOGNAME, USER, XDG_*, etc.). So
+        #   this needs the *image's* Config.Env (from the image inspection
+        #   that image_mismatches() will also need) to subtract, plus an
+        #   exclusion list of Dent's own variables.
 
     def image_mismatches(self):
         ''' Check that the base-images's layers are a prefix of the
@@ -197,6 +221,9 @@ def parseargs(argv:list[str]|None=None) -> Command|Config:
     p.add_argument('-r', '--run-opt', action='append', default=[],
         help="command-line option for 'docker run'; may be specifed multiple"
             " times. Use '-r=-e=FOO=bar' syntax!")
+    p.add_argument('--set-env', metavar='NAME=VALUE', action='append',
+        default=[], help='set the given environment variable when creating'
+            " the container (i.e., pass --env to 'docker run')")
     p.add_argument('-s', '--share-ro', action='append', default=[],
         help='Read-only bind mount the given directories to the same paths'
             ' inside the container. Relative paths are relative to $HOME.')
@@ -247,6 +274,13 @@ def parseargs(argv:list[str]|None=None) -> Command|Config:
 
     args = vars(ns)
     del args['version'], args['list_base_images'], args['print_file']
+    #   argparse collects repeated --set-env options as a list; Config
+    #   wants a dict.
+    try:
+        args['set_env'] = { k: v for k, v in
+                            (kv.split('=', 1) for kv in args['set_env']) }
+    except ValueError:
+        p.error('--set-env arguments must be NAME=VALUE')
     return Config(**args)
 
 ####################################################################

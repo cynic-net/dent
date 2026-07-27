@@ -10,6 +10,13 @@ def test_parseargs_config():
         == (conf.base_image, conf.CONTAINER_NAME, conf.COMMAND,
             conf.share_ro, conf.quiet)
 
+def test_parseargs_set_env():
+    conf = parseargs(['--set-env=FOO=bar', '--set-env=BAZ=', 'mycont'])
+    assert isinstance(conf, Config)
+    assert { 'FOO':'bar', 'BAZ':'' } == conf.set_env
+    with pytest.raises(SystemExit):
+        parseargs(['--set-env=NO_EQUALS_SIGN', 'mycont'])
+
 def test_parseargs_default_command():
     conf = parseargs(['mycont'])
     assert isinstance(conf, Config)
@@ -73,20 +80,23 @@ def test_container_mismatches_ok():
 def test_container_mismatches_bad():
     conf = Config.testconfig(
         share_ro=['/ro/dir', '/badsrc', '/volmnt'],
-        share_rw=['/rw/dir', '/absent'])
+        share_rw=['/rw/dir', '/absent'],
+        set_env={ 'TERM':'vt100' })
     inspect = { 'Mounts': [
         mount('/ro/dir', True),         # mounted, but rw instead of ro
         dict(mount('/badsrc', False), Source='/elsewhere'),
         dict(mount('/volmnt', False), Type='volume'),   # not a bind mount
         mount('/rw/dir', True),         # correct
         mount(DSHARE, True),
-        ]}                              # /absent not mounted at all
+        ]}                              # /absent not mounted at all;
+                                        # TERM not set at all
     ms = conf.container_mismatches(inspect, DSHARE)
-    assert 4 == len(ms)
+    assert 5 == len(ms)
     assert any('/ro/dir' in m and 'read-only' in m  for m in ms)
     assert any('/badsrc' in m                       for m in ms)
     assert any('/volmnt' in m                       for m in ms)
     assert any('/absent' in m and 'read-write' in m for m in ms)
+    assert any('TERM=vt100' in m                    for m in ms)
 
 def test_container_mismatches_dent_share():
     #   Containers predating the share feature, and foreign containers,
@@ -111,6 +121,24 @@ def test_container_mismatches_no_mounts():
     conf = Config.testconfig(share_ro=['/x'])
     assert 2 == len(conf.container_mismatches({ 'Mounts': None }, DSHARE))
     assert 2 == len(conf.container_mismatches({}, DSHARE))
+
+@pytest.mark.parametrize('_id, expected, env', [
+    ('all-set',     [],             ['A=1', 'B=2', 'PATH=/bin']),
+    ('wrong-value', ['B=2'],        ['A=1', 'B=other']),
+    ('unset',       ['A=1'],        ['B=2']),
+    ('no-env',      ['A=1', 'B=2'], None),
+    #   Entries without `=` should not occur, but must not break parsing.
+    ('malformed',   ['A=1', 'B=2'], ['MALFORMED']),
+])
+def test_env_mismatches(_id, expected, env):
+    conf = Config.testconfig(set_env={ 'A':'1', 'B':'2' })
+    inspect = {} if env is None else { 'Config': { 'Env': env } }
+    ms = conf.env_mismatches(inspect)
+    assert len(expected) == len(ms)
+    for kv in expected:  assert any(kv in m for m in ms)
+
+def test_env_mismatches_none_requested():
+    assert [] == Config.testconfig().env_mismatches({})
 
 def test_extra_mounts():
     conf = Config.testconfig(share_ro=['/req/ro'], share_rw=['/req/rw'])

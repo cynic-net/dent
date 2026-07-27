@@ -243,6 +243,9 @@ def create_container(conf:Config):
     xdg_env = tuple('--env=' + k
         for k in sorted(os.environ) if k.startswith('XDG_'))
 
+    set_env = tuple('--env={}={}'.format(k, v)
+        for k, v in sorted(conf.set_env.items()))
+
     images = docker.docker_inspect('image', image.image_alias(conf))
     if conf.force_rebuild:
         image.build_image(conf)
@@ -263,7 +266,7 @@ def create_container(conf:Config):
         '--env=DENT_CONTAINER='+conf.CONTAINER_NAME,
         '--env=LOGNAME='+user, '--env=USER='+user,
         '--rm=false', '--detach=true', '--tty=false',
-        *xdg_env, *shared_path_opts, dent_share_opt, *conf.run_opt,
+        *xdg_env, *set_env, *shared_path_opts, dent_share_opt, *conf.run_opt,
         image.image_alias(conf), 'tail', '-f', '/dev/null' )
     retcode = docker.drcall(conf, command, stdout=DEVNULL)
                                             # stdout prints container ID
