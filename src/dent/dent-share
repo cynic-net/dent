@@ -16,6 +16,10 @@ set -eu
 ####################################################################
 #   Utility functions
 
+progname=$(basename "$0")
+
+die() { local ec=$1; shift; echo 1>&2 "$progname:" "$@"; exit $ec; }
+
 ####################################################################
 #   Commands
 
@@ -26,6 +30,41 @@ command_dir() {
     else
         printf '%s\n' "$state/dent"
     fi
+}
+
+TMATE_FILE=dent-share/tmate.tokens
+
+command_tmate() {
+    [ -n "${TMUX:-}" ] || die 1 "Not in a tmate session."
+
+    local readonly=''
+    case "${1:-}" in
+        -r)     readonly=' read only'; shift;;
+        -*)     die 2 "tmate: unknown option $1";;
+    esac
+
+    local name="${1:-}"
+    [ -n "$name" ] && shift || die 2 "tmate: Session name required"
+
+    local token=$(tmate show-messages \
+        | sed -n "s/.* .tmate. ssh session$readonly: //p" \
+        | tail -1)
+    [ -n "$token" ] || die 9 "Cannot find token!"
+    local tmate_file=$(command_dir)/$TMATE_FILE
+    #   sed in place doesn't work on Mac! Does dent-share dir?
+    #   This re-orders the tmate file and always puts the most recently
+    #   added last. We live with this for the moment, maybe forever.
+    sed -i "/^$name:/d" "$tmate_file"
+    printf "%-10s%s\n" "$name: " "$token" >>"$tmate_file"
+}
+
+command_copy_tmate() {
+    local cont="${1:-}"
+    [ -n "$cont" ] && shift || die 2 "copy-tmate: Container name required"
+    local tmate_file=$(command_dir "$cont")/$TMATE_FILE
+    [ -e "$tmate_file" ] || tmate_file=/dev/null
+    xsel --version >/dev/null || die 4 "copy-tmate: install xsel"
+    cat $tmate_file | xsel --input --clipboard
 }
 
 command_cat_entry_script() {
@@ -48,6 +87,13 @@ Commands:
     print that container's share dir.
   - Else print the base dir holding every container's share.
 
+* tmate [-r] SESSION-NAME: Inside a container, record the current tmate
+  read-write (with '-r', read-only) session token under SESSION-NAME in the
+  file read by 'copy-tmate'. Existing session names will be replaced.
+
+* copy-tmate CONTAINER: Copy the tmate session tokens file for CONTAINER to
+  the clipboard. (This can then be pasted into a text chat program.)
+
 * cat-entry-script SCRIPTNAME: Print the entry script SCRIPTNAME (typically
   something like 'startup.20260720T123922.58937'. If not found (i.e., the
   Dent share isn't working properly), print nothing. This is intended to be
@@ -62,6 +108,9 @@ state=${XDG_STATE_HOME:-$HOME/.local/state}
 case "${1:-}" in
     he*)                usage;;
     dir)                shift; command_dir "$@";;
+    tmate)              shift; command_tmate "$@";;
+    copy-tmate|tmate-copy)
+                        shift; command_copy_tmate "$@";;
     cat-entry-script)   shift; command_cat_entry_script "$@";;
     *) echo 1>&2 "$progname: bad command; try 'help' for usage"; exit 2;;
 esac
