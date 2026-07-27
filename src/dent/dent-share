@@ -19,6 +19,7 @@ set -eu
 progname=$(basename "$0")
 
 die() { local ec=$1; shift; echo 1>&2 "$progname:" "$@"; exit $ec; }
+warn() { echo 1>&2 "$progname warning:" "$@"; }
 
 ####################################################################
 #   Commands
@@ -63,7 +64,10 @@ command_copy_tmate() {
     local cont="${1:-}"
     [ -n "$cont" ] && shift || die 2 "copy-tmate: Container name required"
     local tmate_file=$(command_dir "$cont")/$TMATE_FILE
-    [ -e "$tmate_file" ] || tmate_file=/dev/null
+    [ -r "$tmate_file" ] || {
+        warn "cannot read …/$cont/$TMATE_FILE"
+        tmate_file=/dev/null
+    }
     xsel --version >/dev/null || die 4 "copy-tmate: install xsel"
     cat $tmate_file | xsel --input --clipboard
 }
