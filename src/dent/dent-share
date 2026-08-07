@@ -117,5 +117,5 @@ case "${1:-}" in
     copy-tmate|tmate-copy)
                         shift; command_copy_tmate "$@";;
     cat-entry-script)   shift; command_cat_entry_script "$@";;
-    *) echo 1>&2 "$progname: bad command; try 'help' for usage"; exit 2;;
+    *) echo 1>&2 "$progname: unknown sub-command '${1:-}'; try 'help' for usage"; exit 2;;
 esac
