@@ -9,7 +9,7 @@ import  os, shutil, stat, string
 from    importlib_resources  import files as resfiles
 
 from    dent  import docker
-from    dent.configure  import Config, PrintFileName
+from    dent.configure  import Config, PrintFile
 from    dent.util  import PROGNAME, PWENT, die, qprint
 
 IMAGE_CONF  : dict[str,str]
@@ -106,7 +106,7 @@ def setup_user(base_image:str|None) -> str:
 
 #   Things we can print with -P and their functions producing the text.
 #   The key type keeps these in sync with the -P choices in parseargs().
-PRINT_FILE_ARGS : dict[PrintFileName,Callable[[str|None],str]] = {
+PRINT_FILE_ARGS : dict[PrintFile.Name,Callable[[str|None],str]] = {
     'dockerfile':   dockerfile,
     'setup-pkg':    setup_pkg,
     'setup-user':   setup_user,

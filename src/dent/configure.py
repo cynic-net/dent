@@ -6,33 +6,13 @@ from    dataclasses  import dataclass
 from    textwrap import dedent
 from    typing  import Literal, get_args
 
-#   Names of the files that -P can print; the functions producing their
-#   text are in `dent.image.PRINT_FILE_ARGS`, whose keys mypy checks
-#   against this type.
-PrintFileName = Literal['dockerfile', 'setup-pkg', 'setup-user']
-
 ####################################################################
-#   Commands: requests that main() do something entirely different
-#   from the standard Dent container entry (which is specified by a
-#   Config, below).
-
-@dataclass(frozen=True)
-class PrintVersion: ...
-
-@dataclass(frozen=True)
-class ListBaseImages: ...
-
-@dataclass(frozen=True)
-class PrintFile:
-    file        : PrintFileName
-    base_image  : str|None      # the file contents depend on this
-
-Command = PrintVersion | ListBaseImages | PrintFile
 
 @dataclass
 class Config:
-    ''' The program configuration, from command-line arguments and
-        (eventually) configuration files as well.
+    ''' The program configuration for building and entering a container.
+        Built from command-line arguments and (eventually) configuration
+        files as well.
 
         This is deliberately mutable: the program fills in some values as
         they are computed (e.g. `image_alias()` sets `tag`), and there is
@@ -68,7 +48,30 @@ class Config:
             }
         return Config(**(defaults|kwargs))
 
-def parseargs(argv:list[str]|None=None) -> Command|Config:
+####################################################################
+#   Instead of a Config, parseargs() may return one of the following
+#   requests that main() do something entirely different from the standard
+#   Dent container entry.
+
+@dataclass(frozen=True)
+class PrintVersion: ...
+
+@dataclass(frozen=True)
+class ListBaseImages: ...
+
+@dataclass(frozen=True)
+class PrintFile:
+    #   Names of the files that -P can print; the functions producing their
+    #   text are in `dent.image.PRINT_FILE_ARGS`, whose keys mypy checks
+    #   against this type.
+    Name = Literal['dockerfile', 'setup-pkg', 'setup-user']
+
+    file        : Name
+    base_image  : str|None      # the file contents depend on this
+
+ParseArgs = Config | PrintVersion | ListBaseImages | PrintFile
+
+def parseargs(argv:list[str]|None=None) -> ParseArgs:
     ''' Parse the command line, returning a `Command` for options that
         request something other than the standard container entry, or
         otherwise the `Config` describing that entry.
@@ -128,7 +131,7 @@ def parseargs(argv:list[str]|None=None) -> Command|Config:
         help='container name or ID (required)')
     pe.add_argument('-L', '--list-base-images', action='store_true',
         help='list base images this script knows how to configure')
-    pe.add_argument('-P', '--print-file', choices=get_args(PrintFileName),
+    pe.add_argument('-P', '--print-file', choices=get_args(PrintFile.Name),
         help='instead of entering a container, print given file to stdout')
     pe.add_argument('--version', action='store_true',
         help='show program version information')
