@@ -7,7 +7,8 @@
 from    importlib.metadata  import version
 
 from    dent  import configure, container, image
-from    dent.configure  import Config, ListBaseImages, PrintFile, PrintVersion
+from    dent.configure  import (
+            BuildImage, Config, ListBaseImages, PrintFile, PrintVersion)
 from    dent.util  import PROGNAME
 
 def main(argv:list[str]|None=None):
@@ -22,6 +23,9 @@ def main(argv:list[str]|None=None):
      case Config() as conf:
         #   If we know the given base image name, get any special
         #   configuration for it. Otherwise we use a generic config.
-        image.IMAGE_CONF \
-            = image.BASE_IMAGES.get(conf.base_image or '') or {}
+        match conf.image_source:
+         case BuildImage(base_image):
+            image.IMAGE_CONF = image.BASE_IMAGES.get(base_image) or {}
+         case _:
+            image.IMAGE_CONF = {}
         return container.enter_container(conf)

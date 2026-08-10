@@ -9,7 +9,7 @@ import  os, shutil, stat, string
 from    importlib_resources  import files as resfiles
 
 from    dent  import docker
-from    dent.configure  import Config, PrintFile
+from    dent.configure  import BuildImage, UseImage, Config, PrintFile
 from    dent.util  import PROGNAME, PWENT, die, qprint
 
 IMAGE_CONF  : dict[str,str]
@@ -116,6 +116,12 @@ PRINT_FILE_ARGS : dict[PrintFile.Name,Callable[[str|None],str]] = {
 #   Container image build
 
 def build_image(conf:Config):
+    build_conf:BuildImage|None = None
+    match conf.image_source:
+      case BuildImage(): build_conf = conf.image_source
+      case _: raise RuntimeError('build_image expects conf with BuildImage')
+              # XXXX
+
     perm_r   = stat.S_IRUSR
     perm_rx  = perm_r  | stat.S_IXUSR
     perm_rwx = perm_rx | stat.S_IWUSR
@@ -129,15 +135,15 @@ def build_image(conf:Config):
 
     with open(pjoin(tmpdir, 'Dockerfile'), 'w', encoding='UTF-8') as f:
         os.fchmod(f.fileno(), perm_r)
-        print(dockerfile(conf.base_image), file=f)
+        print(dockerfile(build_conf.base_image), file=f)
 
     with open(pjoin(tmpdir, 'setup-pkg'), 'w', encoding='UTF-8') as f:
         os.fchmod(f.fileno(), perm_rx)
-        print(setup_pkg(conf.base_image), file=f)
+        print(setup_pkg(build_conf.base_image), file=f)
 
     with open(pjoin(tmpdir, 'setup-user'), 'w', encoding='UTF-8') as f:
         os.fchmod(f.fileno(), perm_rx)
-        print(setup_user(conf.base_image), file=f)
+        print(setup_user(build_conf.base_image), file=f)
 
     #   Staged into the image for setup-user to install (see Dockerfile);
     #   readable by the build so setup-user can copy it. No templating: it
@@ -146,7 +152,7 @@ def build_image(conf:Config):
         os.fchmod(f.fileno(), 0o755)
         print(resource_text('dshare'), file=f)
 
-    if conf.force_rebuild:
+    if build_conf.force_rebuild:
         qprint(conf.quiet, "Removing image '{}' and forcing full rebuild" \
             .format(image_alias(conf)))
         docker.drcall(conf,
@@ -158,28 +164,25 @@ def build_image(conf:Config):
         command += ('--progress=plain',)
     if conf.quiet:
         command += ('--quiet',)
-    if conf.force_rebuild:
+    if build_conf.force_rebuild:
         command += ('--no-cache',)
     command += ('--tag', image_alias(conf), tmpdir)
     retcode = docker.drcall(conf, command)
     if retcode != 0:
         die("Error building image '{}' from '{}'"
-            .format(image_alias(conf), conf.base_image))
+            .format(image_alias(conf), build_conf.base_image))
 
     if not conf.keep_tmpdir:
         shutil.rmtree(tmpdir)
 
 def image_alias(conf:Config) -> str:
     ' "Alias" is name plus tag '
-    if conf.image:
-        return conf.image
-    else:
-        if not conf.base_image:
-            #   It would be nice to display the name of the image we would
-            #   build here, but we can't because it wasn't specified and
-            #   we can't generate it from the base image name.
-            die('No such container; supply -B base-image to build.')
-        if not conf.tag:
-            conf.tag = PWENT.pw_name
+    match conf.image_source:
+     case UseImage(image): return image
+     case BuildImage() as build_conf:
+        if not build_conf.tag:
+            build_conf.tag = PWENT.pw_name
         return '{}/{}:{}'.format(
-            PROGNAME, conf.base_image.replace(':', '.'), conf.tag)
+            PROGNAME, build_conf.base_image.replace(':', '.'), build_conf.tag)
+     case None:
+        die('No such container; supply -B base-image to build.')

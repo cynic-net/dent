@@ -9,7 +9,7 @@ from    textwrap  import dedent
 import  os, shlex, time
 
 from    dent  import docker, image
-from    dent.configure  import Config
+from    dent.configure  import BuildImage, UseImage, Config
 from    dent.util  import PWENT, die, qprint
 
 ####################################################################
@@ -30,8 +30,7 @@ def enter_container(conf:Config):
     #   was when it was built. (Otherwise query user about rebuild?)
     #
     not_on_existing = (
-           (conf.base_image is not None)
-        or (conf.image is not None)
+           conf.image_source
         or (len(conf.run_opt) > 0)
         or (len(conf.share_ro) > 0)
         or (len(conf.share_rw) > 0)
@@ -248,9 +247,9 @@ def create_container(conf:Config):
         for k in sorted(os.environ) if k.startswith('XDG_'))
 
     images = docker.docker_inspect('image', image.image_alias(conf))
-    if conf.force_rebuild:
+    if isinstance(conf.image_source, BuildImage):
         image.build_image(conf)
-    elif images or conf.image:
+    elif images or isinstance(conf.image_source, UseImage):
         #   If we found an image, use it. If we were explicitly requested
         #   to use a particular image, make sure we do not try to build it
         #   locally but let `docker run` try to download it.

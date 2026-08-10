@@ -1,5 +1,7 @@
 ''' dent.configure - program configuration from command-line arguments '''
 
+from    dent.util import die
+
 from    argparse  import (
         ArgumentParser, REMAINDER, RawDescriptionHelpFormatter)
 from    dataclasses  import dataclass
@@ -7,6 +9,28 @@ from    textwrap import dedent
 from    typing  import Literal, get_args
 
 ####################################################################
+
+class ConfigError(RuntimeError): ...
+
+@dataclass
+class BuildImage:
+    ''' Create a new image from `base_image`, adding a layer with general
+        setup (etckeeper, package updates, minimal extra package set
+        including bash, etc.) and a layer for the particular user (user,
+        dot-home, etc.).
+    '''
+    base_image      : str
+    force_rebuild   : bool          # default: False
+    tag             : str|None      # default `tag` supplied by build system
+
+@dataclass
+class UseImage:
+    ''' Create a container from an existing image named `image_name`. No
+        extra layers are generated; it's used as-is.
+    '''
+    image           : str
+
+ImageSource = BuildImage | UseImage | None
 
 @dataclass
 class Config:
@@ -24,43 +48,69 @@ class Config:
     #   -P), so the name is always present here.
     CONTAINER_NAME  : str
     COMMAND         : list[str]
-    base_image      : str|None
+    image_source    : ImageSource
     dry_run         : bool
     env_copy        : list[str]
-    force_rebuild   : bool
-    image           : str|None
     keep_tmpdir     : bool
     progress        : bool
     quiet           : bool
     run_opt         : list[str]
     share_ro        : list[str]
     share_rw        : list[str]
-    tag             : str|None
     tmpdir          : str|None
 
     @staticmethod
+    def x_from_args(**kwargs) -> 'Config':
+        use_keys = ['image']
+        use_args = { k: kwargs[k] for k in kwargs if k in use_keys and kwargs[k] is not None}
+        build_keys = ['base_image', 'force_rebuild', 'tag']
+        build_args = { k: kwargs[k] for k in kwargs if k in build_keys }
+        rem_args   = { k: kwargs[k] for k in kwargs
+                        if k not in use_keys + build_keys }
+        if use_args and build_args:
+            die('Conflicting args {} and {} specified.'
+                    .format(use_args.keys(), build_args.keys()))
+        print(build_args)
+        image_source:ImageSource = None
+        if   use_args:   image_source = UseImage(**use_args)
+        elif build_args: image_source = BuildImage(**build_args)
+        print(rem_args)
+        return Config(image_source=image_source, **rem_args)
+
+    @staticmethod
+    def from_args(**args) -> 'Config':
+        #   argparse always sets arguments; `None`/`False` indicates not given.
+        for a in ('image', 'base_image', 'force_rebuild', 'tag'):
+            if not args.get(a): del args[a]
+
+        image_source:ImageSource = None
+        if 'base_image' in args:
+            if 'image' in args:             die('-i conflicts with -B')
+            image_source = BuildImage(args['base_image'],
+                args.get('force_rebuild', False), args.get('tag', None))
+            for a in ('base_image', 'force_rebuild', 'tag'):  args.pop(a, None)
+        elif 'image' in args:
+            if 'force_rebuild' in args:     die('-R conflicts with -i')
+            if 'tag' in args:               die('-R conflicts with -t')
+            image_source = UseImage(args['image'])
+            del args['image']
+
+        if 'force_rebuild' in args:         die('-R requires -B')
+        if 'tag' in args:                   die('-t requires -B')
+        return Config(image_source=image_source, **args)
+
+
+    @staticmethod
     def testconfig(**kwargs) -> 'Config':
-        defaults:dict = { 'CONTAINER_NAME':'Xcname', 'COMMAND':[],
-            'base_image':None, 'dry_run':False, 'env_copy':[],
-            'force_rebuild':False, 'image':None, 'keep_tmpdir':False,
-            'progress':False, 'quiet':False, 'run_opt':[], 'share_ro':[],
-            'share_rw':[], 'tag':None, 'tmpdir':None,
+        defaults:dict = {
+            'CONTAINER_NAME':'Xcname', 'COMMAND':[],
+            'dry_run':False, 'keep_tmpdir':False,
+            'progress':False, 'quiet':False,
+            'image_source':None, 'tmpdir':None,
+            'run_opt':[], 'share_ro':[], 'share_rw':[],
+            'env_copy':[],
             }
         return Config(**(defaults|kwargs))
-
-    def image_opt_error(self) -> str|None:
-        ''' The first inconsistency amongst the options selecting the image
-            for a new container, or `None` if they are consistent.
-
-            `tag` and `force_rebuild` configure the image we build from
-            `base_image`; with `image` we use that image as-is, building
-            nothing. (`base_image` with `image` is caught by parseargs()'s
-            mutually exclusive group, but must be restated here once
-            config files, which argparse does not parse, can supply them.)
-        '''
-        for opt, x in ( ('-R', self.force_rebuild), ('-t', self.tag) ):
-            if x and not self.base_image:  return opt + ' requires -B'
-        return None
 
 ####################################################################
 #   Instead of a Config, parseargs() may return one of the following
@@ -170,7 +220,5 @@ def parseargs(argv:list[str]|None=None) -> ParseArgs:
 
     args = vars(ns)
     del args['version'], args['list_base_images'], args['print_file']
-    conf = Config(**args)
-    err = conf.image_opt_error()
-    if err:  p.error(err)
+    conf = Config.from_args(**args)
     return conf
