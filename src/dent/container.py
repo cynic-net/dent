@@ -52,7 +52,7 @@ def enter_container(conf:Config):
         #   launcher; a foreign container (possibly without even bash) is
         #   entered directly. The Dent share is identified by the ``Source``
         #   path (i.e. path on the host); the in-container path is taken
-        #   care of by the in-container ``dent-share dir`` program.
+        #   care of by the in-container ``dshare dir`` program.
         has_share = has_bind(container, source=dent_share(conf))
 
     waitforstart(conf)
@@ -61,7 +61,7 @@ def enter_container(conf:Config):
     #   into the container. The container was set up with a specifc
     #   $XDG_STATE_HOME (or default $HOME/.local/state) and mounted the
     #   Dent share based on that: different values will silently disable
-    #   the entry script as $HOME/.local/bin/dent-share will no longer
+    #   the entry script as $HOME/.local/bin/dshare will no longer
     #   be able to find it.
 
     #   Rather than using `container.exec_run() and then rewriting the same
@@ -83,7 +83,7 @@ def enter_container(conf:Config):
     if has_share:
         #   Write even on dry run so we can inspect its contents.
         esfname = write_entry_script(conf)
-        contfile = '$HOME/.local/bin/dent-share'
+        contfile = '$HOME/.local/bin/dshare'
         #   We pass a single command to `sh -c` run in the container, which:
         #   1. Checks to see if the entry script is present. (It was created
         #      on the host, but container config determines if it's actually
@@ -151,7 +151,7 @@ def dent_share(conf:Config) -> Path:
         instead of ``$XDG_RUNTIME_DIR`` because containers often outlive the
         session owning the runtime dir.
 
-        This must agree with the `dent-share` script, which computes the
+        This must agree with the `dshare` script, which computes the
         same path for the user inside and outside the container.
     '''
     state = os.environ.get('XDG_STATE_HOME') or Path.home()/'.local'/'state'

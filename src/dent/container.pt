@@ -18,7 +18,7 @@ def mount(src, dst, ty='bind'):
     ('other-source',    False, { 'Mounts': [mount('/other', '/other')] }),
     #   What identifies a bind is the host-side Source; the in-container
     #   path may differ (e.g. the Dent share in older containers, which
-    #   the dent-share script handles itself).
+    #   the dshare script handles itself).
     ('same-dest',       True,  { 'Mounts': [mount(SHARE, SHARE)] }),
     ('old-dest',        True,  { 'Mounts': [mount(SHARE, '/old/path')] }),
     #   A foreign mount at the sought path's usual destination is no bind.

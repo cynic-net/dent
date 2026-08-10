@@ -15,7 +15,7 @@ RUN %{presetup_command}
 COPY setup-pkg /tmp/
 RUN ["/bin/bash", "/tmp/setup-pkg"]
 #   setup-user installs this into the user's ~/.local/bin.
-COPY dent-share /tmp/
+COPY dshare /tmp/
 COPY setup-user /tmp/
 RUN ["/bin/bash", "/tmp/setup-user"]
 

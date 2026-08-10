@@ -50,9 +50,10 @@ Roughly, Dent does the following when you try to enter a container:
 When Dent creates a container, it always creates a 'Dent share' directory
 shared read/write between the host and the container. (This is in addition
 to any shares specified with `-s` or `-S`.) This is used for communication
-between the host and the container. The `dent-share` script and
+between the host and the container. The `dshare dir` command and
 `$DENT_CONTAINER` enviroment variable can be used to find the location of
-the Dent share.
+the Dent share. (The `dshare` script has many other functions; use `dshare
+help` for a summary.)
 
 
 Operation Details
@@ -163,9 +164,9 @@ communication between the host and the container.
 The directories have the same names as their containers and are stored
 under `${XDG_STATE_DIR}/dent/`. (This defaults to `$HOME/.local/state/dent`
 if $XDG_STATE_DIR is not set.) This path can be printed by running
-`dent-share dir` (the `dent-share` script included with Dent). If given a
+`dshare dir` (the `dshare` script is included with Dent). If given a
 second argument after the subcommand, that will be considered a container
-name and appended to the printed path, e.g., `ls -lt "$(dent-share dir
+name and appended to the printed path, e.g., `ls -lt "$(dshare dir
 somecont)/entry-script/"`. Within a container you can use the
 `$DENT_CONTAINER` environment variable to determine your container name.
 
@@ -174,7 +175,7 @@ the environment when Dent enters a container. This includes changing the
 container's current working directory to be the same as it was on the host,
 if that directory exists in the container. The exact environment and
 execution of the script can be confirmed by looking at the most recent file
-in `"$(dent-share-dir $DENT_CONTAINER)/entry-script/"`; the last few of
+in `"$(dshare dir $DENT_CONTAINER)/entry-script/"`; the last few of
 these are kept around for debugging purposes. (For more on exactly how
 those are written, see `dent.container.write_startup_file()`.)
 

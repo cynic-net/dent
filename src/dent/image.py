@@ -142,9 +142,9 @@ def build_image(conf:Config):
     #   Staged into the image for setup-user to install (see Dockerfile);
     #   readable by the build so setup-user can copy it. No templating: it
     #   uses runtime env.
-    with open(pjoin(tmpdir, 'dent-share'), 'w', encoding='UTF-8') as f:
+    with open(pjoin(tmpdir, 'dshare'), 'w', encoding='UTF-8') as f:
         os.fchmod(f.fileno(), 0o755)
-        print(resource_text('dent-share'), file=f)
+        print(resource_text('dshare'), file=f)
 
     if conf.force_rebuild:
         qprint(conf.quiet, "Removing image '{}' and forcing full rebuild" \
