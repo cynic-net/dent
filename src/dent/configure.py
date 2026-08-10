@@ -120,7 +120,7 @@ def parseargs(argv:list[str]|None=None) -> ParseArgs:
         help="tag to use for image (default: username); cannot be used with -i")
 
     #   Options that apply to entering containers
-    pi.add_argument('-e', '--env-copy', metavar='NAME',
+    p.add_argument('-e', '--env-copy', metavar='NAME',
         action='append', default=[], help='environment passthrough: copy'
         ' into the container (at entry time) the named env vars')
 
