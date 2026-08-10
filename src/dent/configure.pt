@@ -24,12 +24,29 @@ def test_parseargs_bad():
     with bad_args():  parseargs(['-P', 'dockerfile', cname])
     with bad_args():  parseargs(['--version', '-L'])
 
-    #   XXX This argparse mutual exclusion is going to go away because
-    #   we're moving towards using a config file, and Argparse won't be
-    #   parsing that so we'll need separate code to handle things like
-    #   this.
-    with bad_args(): parseargs(['-t', 'bimg-tag', '-i', 'contimage', cname])
-    #   Could check stderr here, but not worth it as this is going away
+#   -B and -i are alternative ways of specifying the image for a new
+#   container, and -R and -t configure only the image built from -B.
+#   XXX The -B/-i exclusion is done by argparse, which will not be parsing
+#   config files; it will have to be restated as a check on the merged
+#   Config, as the -R and -t checks already are.
+@pytest.mark.parametrize('_id, ok, opts', [
+    ('base',        True,   ['-B', 'deb']),
+    ('image',       True,   ['-i', 'img']),
+    ('neither',     True,   []),
+    ('base+tag',    True,   ['-B', 'deb', '-t', 'tg']),
+    ('base+rebuild',True,   ['-B', 'deb', '-R']),
+    ('base+image',  False,  ['-B', 'deb', '-i', 'img']),
+    ('tag alone',   False,  ['-t', 'tg']),
+    ('rebuild alone',False, ['-R']),
+    ('image+tag',   False,  ['-i', 'img', '-t', 'tg']),
+    ('image+rebuild',False, ['-i', 'img', '-R']),
+])
+def test_parseargs_image_opts(_id, ok, opts):
+    argv = opts + ['mycont']
+    if ok:
+        assert isinstance(parseargs(argv), Config)
+    else:
+        with pytest.raises(SystemExit):  parseargs(argv)
 
 def test_parseargs_version():
     assert PrintVersion() == parseargs(['--version'])

@@ -48,6 +48,20 @@ class Config:
             }
         return Config(**(defaults|kwargs))
 
+    def image_opt_error(self) -> str|None:
+        ''' The first inconsistency amongst the options selecting the image
+            for a new container, or `None` if they are consistent.
+
+            `tag` and `force_rebuild` configure the image we build from
+            `base_image`; with `image` we use that image as-is, building
+            nothing. (`base_image` with `image` is caught by parseargs()'s
+            mutually exclusive group, but must be restated here once
+            config files, which argparse does not parse, can supply them.)
+        '''
+        for opt, x in ( ('-R', self.force_rebuild), ('-t', self.tag) ):
+            if x and not self.base_image:  return opt + ' requires -B'
+        return None
+
 ####################################################################
 #   Instead of a Config, parseargs() may return one of the following
 #   requests that main() do something entirely different from the standard
@@ -91,16 +105,25 @@ def parseargs(argv:list[str]|None=None) -> ParseArgs:
         help="don't execute docker image commands, just print them on stderr")
     p.add_argument('-q', '--quiet', action='store_true')
 
+    #   The image for a new container is either built by us from a base
+    #   image or taken as-is; -R and -t configure only the former, which
+    #   `Config.image_opt_error()` checks after parsing.
+    pi = p.add_mutually_exclusive_group()
+    pi.add_argument('-B', '--base-image',
+        help='base image from which to build container image')
+    pi.add_argument('-i', '--image', help='existing image to use'
+        ' for creating a new container (downloaded if necessary)')
+
     #   Options that apply to building images and containers
     p.add_argument('--keep-tmpdir', action='store_true',
         help='when done, do not delete tmpdir containing build files')
-    p.add_argument('-B', '--base-image',
-        help='base image from which to build container image')
     p.add_argument('-V', '--progress', action='store_true',
         help='Set --progress=plain on `docker build` to see all build output.')
     p.add_argument('-R', '--force-rebuild', action='store_true',
         help='untag any existing image and rebuild it, ignoring cached images'
-             " (only if container doesn't exist)")
+             " (requires -B; only if container doesn't exist)")
+    p.add_argument('-t', '--tag', help='tag for the image built from -B'
+        ' (default: username); requires -B')
     p.add_argument('-r', '--run-opt', action='append', default=[],
         help="command-line option for 'docker run'; may be specifed multiple"
             " times. Use '-r=-e=FOO=bar' syntax!")
@@ -111,13 +134,6 @@ def parseargs(argv:list[str]|None=None) -> ParseArgs:
         help='Read-write bind mount the given directories to the same paths'
             ' inside the container. Relative paths are relative to $HOME.')
     p.add_argument('--tmpdir', help='directory to use for Docker build context')
-
-    #   Mutually-exclusive options to determine image name
-    pi = p.add_mutually_exclusive_group()
-    pi.add_argument('-i', '--image', help='existing image to use'
-        ' for creating a new container (downloaded if necessary)')
-    pi.add_argument('-t', '--tag',
-        help="tag to use for image (default: username); cannot be used with -i")
 
     #   Options that apply to entering containers
     p.add_argument('-e', '--env-copy', metavar='NAME',
@@ -154,4 +170,7 @@ def parseargs(argv:list[str]|None=None) -> ParseArgs:
 
     args = vars(ns)
     del args['version'], args['list_base_images'], args['print_file']
-    return Config(**args)
+    conf = Config(**args)
+    err = conf.image_opt_error()
+    if err:  p.error(err)
+    return conf
