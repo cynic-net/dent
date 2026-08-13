@@ -105,7 +105,7 @@ def setup_user(base_image:str|None) -> str:
     return PTemplate(SETUP_USER).substitute(template_args)
 
 #   Things we can print with -P and their functions producing the text.
-#   The key type keeps these in sync with the -P choices in parseargs().
+#   The key type keeps these in sync with the -P choices in action().
 PRINT_FILE_ARGS : dict[PrintFile.Name,Callable[[str|None],str]] = {
     'dockerfile':   dockerfile,
     'setup-pkg':    setup_pkg,

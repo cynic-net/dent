@@ -25,7 +25,7 @@ class BuildImage:
 
 @dataclass
 class UseImage:
-    ''' Create a container from an existing image named `image_name`. No
+    ''' Create a container from the existing image named `image`. No
         extra layers are generated; it's used as-is.
     '''
     image           : str
@@ -39,13 +39,11 @@ class Config:
         files as well.
 
         This is deliberately mutable: the program fills in some values as
-        they are computed (e.g. `image_alias()` sets `tag`), and there is
-        only a single user of this that uses it in a purely sequential
+        they are computed (e.g. `build_image()` sets `tmpdir`), and there
+        is only a single user of this that uses it in a purely sequential
         manner.
     '''
-    #   parseargs() returns a Command instead of constructing this when
-    #   given the options that may replace CONTAINER_NAME (--version, -L,
-    #   -P), so the name is always present here.
+
     CONTAINER_NAME  : str
     COMMAND         : list[str]
     image_source    : ImageSource
@@ -128,9 +126,7 @@ class Enter:
 Action = Enter | PrintVersion | ListBaseImages | PrintFile
 
 def action(argv:list[str]|None=None) -> Action:
-    ''' Parse the command line, returning a `Command` for options that
-        request something other than the standard container entry, or
-        otherwise the `Config` describing that entry.
+    ''' Parse the command line, returning the `Action` it requests.
 
         This is pure but for one exception: ArgumentParser itself prints
         and exits for bad arguments and --help.
@@ -147,9 +143,9 @@ def action(argv:list[str]|None=None) -> Action:
         help="don't execute docker image commands, just print them on stderr")
     p.add_argument('-q', '--quiet', action='store_true')
 
-    #   The image for a new container is either built by us from a base
-    #   image or taken as-is; -R and -t configure only the former, which
-    #   `Config.image_opt_error()` checks after parsing.
+    #   The image for a new container is either built by us fromR a base
+    #   image or taken as-is; -R and -t configure onlRy the former, which
+    #   `Config.from_args()` checks after parsing.
     pi = p.add_mutually_exclusive_group()
     pi.add_argument('-B', '--base-image',
         help='base image from which to build container image')
