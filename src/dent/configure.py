@@ -4,7 +4,7 @@ from    dent.util import die
 
 from    argparse  import (
         ArgumentParser, REMAINDER, RawDescriptionHelpFormatter)
-from    dataclasses  import dataclass
+from    dataclasses  import dataclass, fields, field
 from    pathlib  import Path
 from    textwrap import dedent
 from    typing  import Literal, get_args
@@ -13,6 +13,78 @@ from    typing  import Literal, get_args
 
 class ConfigError(RuntimeError): ...
 
+class InternalError(RuntimeError): ...
+
+def consinterr(msg):
+    def r(): raise InternalError(msg)
+    return r
+
+#####################################################################
+#   Argument Parsing Setup Support
+
+def add_dataclass_args(p:ArgumentParser, cls:type) -> None:
+    ''' Read through all fields and configure an `ArgumentParser` to parse
+        the options (short and long) for each field. See the code for the
+        data types that are understood. Anything that isn't one of these or
+        is otherwise unusual can be ignored with ``'ignore': True`` in the
+        metadata or configured in a custom way with a ``@staticmethod
+        cls.add_arg_FIELDNAME()`` function.
+    '''
+    for f in fields(cls):
+        if f.name.isupper():  continue  # Upper-case fields are positional;
+                                        # action() must add those at end.
+        add_arg = getattr(cls, 'add_arg_' + f.name, None)
+        if add_arg:  add_arg(p); continue
+
+        long_opt = '--' + f.name.replace('_', '-')
+        args = [long_opt]
+        short_opt = short_options.get(long_opt)
+        if short_opt:  args = [short_opt] + args
+        if f.metadata.get('ignore'):  continue
+        help = f.metadata.get('help')
+        if f.type is bool:
+            p.add_argument(*args, action='store_true', help=help)
+        elif f.type == str|None:
+            p.add_argument(*args, action='store', default='',
+                metavar=f.metadata.get('metavar'), help=help)
+        elif f.type == list[str]:   # `is` fails; each subscript is new
+            p.add_argument(*args, action='append', default=[],
+                metavar=f.metadata.get('metavar'), help=help)
+        elif f.type == dict[str,str]:
+            p.add_argument(*args, action='append', default=[],
+                metavar=f.metadata.get('metavar'), help=help)
+        else:
+            raise InternalError(
+                f"add_dataclass_args didn't handle field '{f.name}'")
+
+def dataclass_fieldnames(cls):
+    return tuple( f.name for f in fields(cls) )
+
+####################################################################
+#   Configuration Classes
+
+#   We keep a separate list of all short options all together, and sorted
+#   by short option name, so we can easily see which short options are
+#   assigned and which are free. This includes options for BuildImage,
+#   RunImage, Config and options that action() adds itself.
+#
+short_options = {
+    '--base-image':         '-B',
+    '--env-copy':           '-e',
+   #'--help':               '-h',   # supplied by argparse itself
+    '--image':              '-i',
+    '--list-base-images':   '-L',
+    '--dry-run':            '-n',
+    '--print-file':         '-P',
+    '--quiet':              '-q',
+    '--force-rebuild':      '-R',
+    '--run-opt':            '-r',
+    '--share-rw':           '-S',
+    '--share-ro':           '-s',
+    '--tag':                '-t',
+    '--progress':           '-V',
+}
+
 @dataclass
 class BuildImage:
     ''' Create a new image from `base_image`, adding a layer with general
@@ -20,9 +92,17 @@ class BuildImage:
         including bash, etc.) and a layer for the particular user (user,
         dot-home, etc.).
     '''
-    base_image      : str
-    force_rebuild   : bool          # default: False
-    tag             : str|None      # default `tag` supplied by build system
+    base_image      : str               = field(metadata={ 'ignore':True })
+    tag             : str|None          = field(default=None, metadata={
+                    'help':'tag for the image built from -B (default: username); requires -B' })
+    tmpdir          : str|None          = field(default=None, metadata={
+                    'help':'directory to use for Docker build context'})
+    keep_tmpdir     : bool              = field(default=False, metadata={
+                    'help':'when done, do not delete tmpdir containing build files' })
+    force_rebuild   : bool              = field(default=False, metadata={
+                    'help':"untag any existing image and rebuild it, ignoring cached images' (requires -B; only if container doesn't exist)" })
+    progress        : bool              = field(default=False, metadata={
+                    'help':'Set --progress=plain on `docker build` to see all build output.' })
 
 @dataclass
 class UseImage:
@@ -32,6 +112,18 @@ class UseImage:
     image           : str
 
 ImageSource = BuildImage | UseImage | None
+
+@dataclass
+class RunConfig:
+    ' `docker run` parameters: the final step of building the container. '
+    run_opt         : list[str]         = field(default_factory=list, metadata={
+                    'help':"command-line option for 'docker run'; may be specifed multiple times. Use '-r=-e=FOO=bar' syntax!" })
+    set_env         : dict[str,str]     = field(default_factory=dict, metadata={
+                    'help':"set the given environment variable when creating the container (i.e., pass --env to 'docker run')" })
+    share_ro        : list[str]         = field(default_factory=list, metadata={
+                    'help':'Read-only bind mount the given directories to the same paths inside the container. Relative paths are relative to $HOME.' })
+    share_rw        : list[str]         = field(default_factory=list, metadata={
+                    'help':'Read-write bind mount the given directories to the same paths inside the container. Relative paths are relative to $HOME.' })
 
 @dataclass
 class Config:
@@ -45,56 +137,91 @@ class Config:
         manner.
     '''
 
-    CONTAINER_NAME  : str
-    COMMAND         : list[str]
-    image_source    : ImageSource
-    dry_run         : bool
-    env_copy        : list[str]
-    keep_tmpdir     : bool
-    progress        : bool
-    quiet           : bool
-    run_opt         : list[str]
-    set_env         : dict[str,str]
-    share_ro        : list[str]
-    share_rw        : list[str]
-    tmpdir          : str|None
+    ####################################################################
+    #   Constructors
 
     @staticmethod
     def from_args(**args) -> 'Config':
+        build_opts = dataclass_fieldnames(BuildImage)
+        image_opts = dataclass_fieldnames(UseImage)
+
         #   argparse always sets arguments; `None`/`False` indicates not given.
-        for a in ('image', 'base_image', 'force_rebuild', 'tag'):
+        for a in build_opts + image_opts:
             if not args.get(a): del args[a]
 
         image_source:ImageSource = None
         if 'base_image' in args:
             if 'image' in args:             die('-i conflicts with -B')
             image_source = BuildImage(args['base_image'],
-                args.get('force_rebuild', False), args.get('tag', None))
-            for a in ('base_image', 'force_rebuild', 'tag'):  args.pop(a, None)
+                tag=args.get('tag', None),
+                tmpdir=args.get('tmpdir', None),
+                keep_tmpdir=args.get('keep_tmpdir', False),
+                force_rebuild=args.get('force_rebuild', False),
+                progress=args.get('progress', False),
+            )
+            for a in build_opts: args.pop(a, None)
         elif 'image' in args:
-            if 'force_rebuild' in args:     die('-R conflicts with -i')
-            if 'tag' in args:               die('-R conflicts with -t')
+            for b in build_opts:
+                if b in args: die(f'force_rebuild conflicts with {b}')
             image_source = UseImage(args['image'])
             del args['image']
 
-        #   If `base_image` is not specified, `force_rebuild` and `tag` are
-        #   ignored, just as they are ignored when `base_image` is specified
-        #   but we don't force a rebuild.
-        args.pop('force_rebuild', None); args.pop('tag', None)
-        return Config(image_source=image_source, **args)
+        run_config = RunConfig(
+            run_opt=args['run_opt'],
+            set_env=args['set_env'],
+            share_ro=args['share_ro'],
+            share_rw=args['share_rw'],
+        )
+        for a in dataclass_fieldnames(RunConfig):
+            args.pop(a, None)
 
+        #   If `base_image` is not specified, other build options like
+        #   `force_rebuild` and `tag` are ignored, just as they are ignored
+        #   when `base_image` is specified but we don't force a rebuild.
+        for a in build_opts:
+            args.pop(a, None)
+        return Config(image_source=image_source, run_config=run_config, **args)
 
     @staticmethod
     def testconfig(**kwargs) -> 'Config':
-        defaults:dict = {
-            'CONTAINER_NAME':'Xcname', 'COMMAND':[],
-            'dry_run':False, 'keep_tmpdir':False,
-            'progress':False, 'quiet':False,
-            'image_source':None, 'tmpdir':None,
-            'run_opt':[], 'share_ro':[], 'share_rw':[], 'set_env':{},
-            'env_copy':[],
-            }
-        return Config(**(defaults|kwargs))
+        if 'run_config' not in kwargs:
+            #   Config does not have a default RunConfig to ensure that
+            #   from_args constructs one. So we need to follow along.
+            kwargs['run_config'] = RunConfig()
+        return Config(**( { 'CONTAINER_NAME':'Xcname', } | kwargs))
+
+    ####################################################################
+    #   Configuration variables and argument parsing
+
+    CONTAINER_NAME  : str
+    COMMAND         : list[str]         = field(default_factory=list)
+    image_source    : ImageSource       = None
+    run_config      : RunConfig         = field(default_factory=consinterr('RunConfig'))
+    dry_run         : bool              = field(default=False, metadata={
+                    'help':"don't execute docker image commands, just print them on stderr" })
+    env_copy        : list[str]         = field(default_factory=list, metadata={
+                    'metavar':'NAME',
+                    'help':'environment passthrough: copy into the container (at entry time) the named env vars' })
+    quiet           : bool              = False
+
+    @staticmethod
+    def add_arg_image_source(p:ArgumentParser) -> None:
+        #   The image for a new container is either built by us from a base
+        #   image or taken as-is; -R and -t configure only the former,
+        #   which `Config.from_args()` checks after parsing.
+        pi = p.add_mutually_exclusive_group()
+        pi.add_argument('-B', '--base-image',
+            help='base image from which to build container image')
+        pi.add_argument('-i', '--image', help='existing image to use'
+            ' for creating a new container (downloaded if necessary)')
+        add_dataclass_args(p, BuildImage)
+
+    @staticmethod
+    def add_arg_run_config(p:ArgumentParser) -> None:
+        add_dataclass_args(p, RunConfig)
+
+    ####################################################################
+    #   Configuration matching
 
     def container_mismatches(self, inspect:dict, share:Path) -> list[str]:
         ''' Return warnings describing how this container differs from the
@@ -144,7 +271,7 @@ class Config:
                   for kv in (inspect.get('Config') or {}).get('Env') or []
                   if '=' in kv ) }
         return [ 'existing container does not set {}={}'.format(k, v)
-                 for k, v in sorted(self.set_env.items())
+                 for k, v in sorted(self.run_config.set_env.items())
                  if env.get(k) != v ]
 
     def extra_mounts(self, inspect:dict, share:Path) -> list[str]:
@@ -173,8 +300,8 @@ class Config:
             relative to `Path.home()`.
         '''
         home = Path.home()
-        return [ (home / s, False) for s in self.share_ro ] \
-             + [ (home / s, True)  for s in self.share_rw ]
+        return [ (home / s, False) for s in self.run_config.share_ro ] \
+             + [ (home / s, True)  for s in self.run_config.share_rw ]
 
     def extra_env(self):
         ''' Warnings for environment variables the existing container was
@@ -235,77 +362,33 @@ def action(argv:list[str]|None=None) -> Action:
         This is pure but for one exception: ArgumentParser itself prints
         and exits for bad arguments and --help.
     '''
-    p = ArgumentParser(formatter_class=RawDescriptionHelpFormatter,
+    parser = ArgumentParser(formatter_class=RawDescriptionHelpFormatter,
         description=dedent('''
             Start a new process in a Docker container, creating the container
             and image if necessary. For detailed documentation, see:
                 https://github.com/cynic-net/dent
         '''))
-
-    #   General options that apply to most commands
-    p.add_argument('-n', '--dry-run', action='store_true',
-        help="don't execute docker image commands, just print them on stderr")
-    p.add_argument('-q', '--quiet', action='store_true')
-
-    #   The image for a new container is either built by us fromR a base
-    #   image or taken as-is; -R and -t configure onlRy the former, which
-    #   `Config.from_args()` checks after parsing.
-    pi = p.add_mutually_exclusive_group()
-    pi.add_argument('-B', '--base-image',
-        help='base image from which to build container image')
-    pi.add_argument('-i', '--image', help='existing image to use'
-        ' for creating a new container (downloaded if necessary)')
-
-    #   Options that apply to building images and containers
-    p.add_argument('--keep-tmpdir', action='store_true',
-        help='when done, do not delete tmpdir containing build files')
-    p.add_argument('-V', '--progress', action='store_true',
-        help='Set --progress=plain on `docker build` to see all build output.')
-    p.add_argument('-R', '--force-rebuild', action='store_true',
-        help='untag any existing image and rebuild it, ignoring cached images'
-             " (requires -B; only if container doesn't exist)")
-    p.add_argument('-t', '--tag', help='tag for the image built from -B'
-        ' (default: username); requires -B')
-    p.add_argument('-r', '--run-opt', action='append', default=[],
-        help="command-line option for 'docker run'; may be specifed multiple"
-            " times. Use '-r=-e=FOO=bar' syntax!")
-    p.add_argument('--set-env', metavar='NAME=VALUE', action='append',
-        default=[], help='set the given environment variable when creating'
-            " the container (i.e., pass --env to 'docker run')")
-    p.add_argument('-s', '--share-ro', action='append', default=[],
-        help='Read-only bind mount the given directories to the same paths'
-            ' inside the container. Relative paths are relative to $HOME.')
-    p.add_argument('-S', '--share-rw', action='append', default=[],
-        help='Read-write bind mount the given directories to the same paths'
-            ' inside the container. Relative paths are relative to $HOME.')
-    p.add_argument('--tmpdir', help='directory to use for Docker build context')
-
-    #   Options that apply to entering containers
-    p.add_argument('-e', '--env-copy', metavar='NAME',
-        action='append', default=[], help='environment passthrough: copy'
-        ' into the container (at entry time) the named env vars')
-
-    #   We must have either a container name or one of the options that
-    #   requests information.
-    pe = p.add_mutually_exclusive_group(required=True)
-    pe.add_argument('CONTAINER_NAME', nargs='?',
+    add_dataclass_args(parser, Config)
+    #   Options indicating the action we take.
+    pact = parser.add_mutually_exclusive_group(required=True)
+    pact.add_argument('CONTAINER_NAME', nargs='?',
         help='container name or ID (required)')
-    pe.add_argument('-L', '--list-base-images', action='store_true',
+    pact.add_argument('-L', '--list-base-images', action='store_true',
         help='list base images this script knows how to configure')
-    pe.add_argument('-P', '--print-file', choices=get_args(PrintFile.Name),
+    pact.add_argument('-P', '--print-file', choices=get_args(PrintFile.Name),
         help='instead of entering a container, print given file to stdout')
-    pe.add_argument('--version', action='store_true',
+    pact.add_argument('--version', action='store_true',
         help='show program version information')
-
-    #   All remaining args are the command to run in the container.
-    p.add_argument('COMMAND', nargs=REMAINDER, default='SEE BELOW',
+    #   For Entry action, all remaining args are the command to run in the
+    #   container.
+    parser.add_argument('COMMAND', nargs=REMAINDER, default='SEE BELOW',
         help='command to run in container (default: bash -l)')
 
-    ns = p.parse_args(argv)
-
+    ns = parser.parse_args(argv)
     if ns.version:              return PrintVersion()
     if ns.list_base_images:     return ListBaseImages()
     if ns.print_file:           return PrintFile(ns.print_file, ns.base_image)
+    #   Otherwise fallthrough to validate and set up `Entry`.
 
     #   `default=` does not work with nargs=REMAINDER. We cannot use
     #   nargs='*' because that will cause options in the remainder to be
@@ -316,11 +399,8 @@ def action(argv:list[str]|None=None) -> Action:
     args = vars(ns)
     del args['version'], args['list_base_images'], args['print_file']
     #   argparse collects --set-env options as a list; RunConfig wants a dict.
-    try:
-        args['set_env'] = { k: v for k, v in
-                            (kv.split('=', 1) for kv in args['set_env']) }
-    except ValueError:
-        p.error('--set-env arguments must be NAME=VALUE')
+    try: args['set_env'] = dict( kv.split('=', 1) for kv in args['set_env'] )
+    except ValueError: parser.error('--set-env arguments must be NAME=VALUE')
     return Enter(Config.from_args(**args))
 
 ####################################################################

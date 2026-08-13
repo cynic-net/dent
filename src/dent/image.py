@@ -116,34 +116,34 @@ PRINT_FILE_ARGS : dict[PrintFile.Name,Callable[[str|None],str]] = {
 #   Container image build
 
 def build_image(conf:Config):
-    build_conf:BuildImage|None = None
+    bi:BuildImage|None = None
     match conf.image_source:
-      case BuildImage(): build_conf = conf.image_source
+      case BuildImage(): bi = conf.image_source
       case _: raise RuntimeError('build_image expects conf with BuildImage')
               # XXXX
 
     perm_r   = stat.S_IRUSR
     perm_rx  = perm_r  | stat.S_IXUSR
     perm_rwx = perm_rx | stat.S_IWUSR
-    if not conf.tmpdir:
-        conf.tmpdir = tmpdir = mkdtemp(prefix=PROGNAME+'-build-')
+    if not bi.tmpdir:
+        bi.tmpdir = tmpdir = mkdtemp(prefix=PROGNAME+'-build-')
     else:
-        tmpdir = conf.tmpdir
+        tmpdir = bi.tmpdir
         os.mkdir(tmpdir, perm_rwx)  # We want to die if it already exists
     qprint(conf.quiet, 'Setting up context for image build in {}'.format(tmpdir),
-        force_print=conf.keep_tmpdir)
+        force_print=bi.keep_tmpdir)
 
     with open(pjoin(tmpdir, 'Dockerfile'), 'w', encoding='UTF-8') as f:
         os.fchmod(f.fileno(), perm_r)
-        print(dockerfile(build_conf.base_image), file=f)
+        print(dockerfile(bi.base_image), file=f)
 
     with open(pjoin(tmpdir, 'setup-pkg'), 'w', encoding='UTF-8') as f:
         os.fchmod(f.fileno(), perm_rx)
-        print(setup_pkg(build_conf.base_image), file=f)
+        print(setup_pkg(bi.base_image), file=f)
 
     with open(pjoin(tmpdir, 'setup-user'), 'w', encoding='UTF-8') as f:
         os.fchmod(f.fileno(), perm_rx)
-        print(setup_user(build_conf.base_image), file=f)
+        print(setup_user(bi.base_image), file=f)
 
     #   Staged into the image for setup-user to install (see Dockerfile);
     #   readable by the build so setup-user can copy it. No templating: it
@@ -152,7 +152,7 @@ def build_image(conf:Config):
         os.fchmod(f.fileno(), 0o755)
         print(resource_text('dshare'), file=f)
 
-    if build_conf.force_rebuild:
+    if bi.force_rebuild:
         qprint(conf.quiet, "Removing image '{}' and forcing full rebuild" \
             .format(image_alias(conf)))
         docker.drcall(conf,
@@ -160,29 +160,29 @@ def build_image(conf:Config):
 
     qprint(conf.quiet, "Building image '{}'".format(image_alias(conf)))
     command = docker.DOCKER_COMMAND + ('build',)
-    if conf.progress:
+    if bi.progress:
         command += ('--progress=plain',)
     if conf.quiet:
         command += ('--quiet',)
-    if build_conf.force_rebuild:
+    if bi.force_rebuild:
         command += ('--no-cache',)
     command += ('--tag', image_alias(conf), tmpdir)
     retcode = docker.drcall(conf, command)
     if retcode != 0:
         die("Error building image '{}' from '{}'"
-            .format(image_alias(conf), build_conf.base_image))
+            .format(image_alias(conf), bi.base_image))
 
-    if not conf.keep_tmpdir:
+    if not bi.keep_tmpdir:
         shutil.rmtree(tmpdir)
 
 def image_alias(conf:Config) -> str:
     ' "Alias" is name plus tag '
     match conf.image_source:
      case UseImage(image): return image
-     case BuildImage() as build_conf:
-        if not build_conf.tag:
-            build_conf.tag = PWENT.pw_name
+     case BuildImage() as bi:
+        if not bi.tag:
+            bi.tag = PWENT.pw_name
         return '{}/{}:{}'.format(
-            PROGNAME, build_conf.base_image.replace(':', '.'), build_conf.tag)
+            PROGNAME, bi.base_image.replace(':', '.'), bi.tag)
      case None:
         die('No such container; supply -B base-image to build.')

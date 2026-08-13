@@ -27,7 +27,7 @@ def enter_container(conf:Config):
     #   image layer checks) we simply refuse.
     not_on_existing = (
            conf.image_source
-        or (len(conf.run_opt) > 0)
+        or (len(conf.run_config.run_opt) > 0)
         )
     not_on_existing_msg \
         = '-B, -i and -r options cannot affect existing containers'
@@ -243,7 +243,7 @@ def create_container(conf:Config):
         for k in sorted(os.environ) if k.startswith('XDG_'))
 
     set_env = tuple('--env={}={}'.format(k, v)
-        for k, v in sorted(conf.set_env.items()))
+        for k, v in sorted(conf.run_config.set_env.items()))
 
     images = docker.docker_inspect('image', image.image_alias(conf))
     if isinstance(conf.image_source, BuildImage):
@@ -265,7 +265,8 @@ def create_container(conf:Config):
         '--env=DENT_CONTAINER='+conf.CONTAINER_NAME,
         '--env=LOGNAME='+user, '--env=USER='+user,
         '--rm=false', '--detach=true', '--tty=false',
-        *xdg_env, *set_env, *shared_path_opts, dent_share_opt, *conf.run_opt,
+        *xdg_env,
+        *set_env, *shared_path_opts, dent_share_opt, *conf.run_config.run_opt,
         image.image_alias(conf), 'tail', '-f', '/dev/null' )
     retcode = docker.drcall(conf, command, stdout=DEVNULL)
                                             # stdout prints container ID

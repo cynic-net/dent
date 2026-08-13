@@ -5,6 +5,14 @@ import  pytest
 ####################################################################
 #   Specific Options Tests
 
+@pytest.mark.parametrize('cls, fieldnames', [
+    (BuildImage, ('base_image', 'tag', 'tmpdir', 'keep_tmpdir', 'force_rebuild', 'progress', )),
+    (UseImage,   ('image', )),
+    (RunConfig,  ('run_opt', 'set_env', 'share_ro', 'share_rw', )),
+])
+def test_dataclass_fieldnames(cls, fieldnames):
+    assert fieldnames == dataclass_fieldnames(cls)
+
 def test_parseargs_config():
     enter = action(['-B', 'debian:12', '-s', 'foo', 'mycont', 'echo', 'hi'])
     assert isinstance(enter, Enter)
@@ -12,7 +20,7 @@ def test_parseargs_config():
     assert isinstance(config.image_source, BuildImage)
     assert ('debian:12', 'mycont', ['echo', 'hi'], ['foo'], False) \
         == (config.image_source.base_image, config.CONTAINER_NAME,
-            config.COMMAND, config.share_ro, config.quiet)
+            config.COMMAND, config.run_config.share_ro, config.quiet)
 
 def test_action_version():
     assert PrintVersion() == action(['--version'])
@@ -28,7 +36,7 @@ def test_action_print_file():
 def test_parseargs_set_env():
     enter = action(['--set-env=FOO=bar', '--set-env=BAZ=', 'mycont'])
     assert isinstance(enter, Enter)
-    assert { 'FOO':'bar', 'BAZ':'' } == enter.config.set_env
+    assert { 'FOO':'bar', 'BAZ':'' } == enter.config.run_config.set_env
     with pytest.raises(SystemExit):
         action(['--set-env=NO_EQUALS_SIGN', 'mycont'])
 
@@ -79,8 +87,8 @@ def test_action_image_opts(_id, ok, opts):
 
 def test_share_paths():
     home = Path.home()
-    conf = Config.testconfig(
-        share_ro=['/etc/foo', 'rel'], share_rw=['/home/bar'])
+    conf = Config.testconfig(run_config=RunConfig(
+        share_ro=['/etc/foo', 'rel'], share_rw=['/home/bar']))
     assert [    (Path('/etc/foo'), False),
                 (home/'rel',       False),
                 (Path('/home/bar'), True),
@@ -94,7 +102,8 @@ def mount(p, rw):
 DSHARE = Path('/home/x/.local/state/dent/Xcname')
 
 def test_container_mismatches_ok():
-    conf = Config.testconfig(share_ro=['/ro/dir'], share_rw=['/rw/dir'])
+    conf = Config.testconfig(
+        run_config=RunConfig(share_ro=['/ro/dir'], share_rw=['/rw/dir']))
     inspect = { 'Mounts': [
         mount('/ro/dir', False), mount('/rw/dir', True), mount(DSHARE, True),
         mount('/unrelated', True),      # extra mounts are not a mismatch
@@ -102,10 +111,10 @@ def test_container_mismatches_ok():
     assert [] == conf.container_mismatches(inspect, DSHARE)
 
 def test_container_mismatches_bad():
-    conf = Config.testconfig(
+    conf = Config.testconfig(run_config=RunConfig(
         share_ro=['/ro/dir', '/badsrc', '/volmnt'],
         share_rw=['/rw/dir', '/absent'],
-        set_env={ 'TERM':'vt100' })
+        set_env={ 'TERM':'vt100' }))
     inspect = { 'Mounts': [
         mount('/ro/dir', True),         # mounted, but rw instead of ro
         dict(mount('/badsrc', False), Source='/elsewhere'),
@@ -142,7 +151,7 @@ def test_container_mismatches_dent_share():
 
 def test_container_mismatches_no_mounts():
     #   Foreign containers may have no Mounts entry, or one that is null.
-    conf = Config.testconfig(share_ro=['/x'])
+    conf = Config.testconfig(run_config=RunConfig(share_ro=['/x']))
     assert 2 == len(conf.container_mismatches({ 'Mounts': None }, DSHARE))
     assert 2 == len(conf.container_mismatches({}, DSHARE))
 
@@ -155,7 +164,7 @@ def test_container_mismatches_no_mounts():
     ('malformed',   ['A=1', 'B=2'], ['MALFORMED']),
 ])
 def test_env_mismatches(_id, expected, env):
-    conf = Config.testconfig(set_env={ 'A':'1', 'B':'2' })
+    conf = Config.testconfig(run_config=RunConfig(set_env={ 'A':'1', 'B':'2' }))
     inspect = {} if env is None else { 'Config': { 'Env': env } }
     ms = conf.env_mismatches(inspect)
     assert len(expected) == len(ms)
@@ -165,7 +174,8 @@ def test_env_mismatches_none_requested():
     assert [] == Config.testconfig().env_mismatches({})
 
 def test_extra_mounts():
-    conf = Config.testconfig(share_ro=['/req/ro'], share_rw=['/req/rw'])
+    conf = Config.testconfig(
+        run_config=RunConfig(share_ro=['/req/ro'], share_rw=['/req/rw']))
     inspect = { 'Mounts': [
         mount('/req/ro', False),                # requested: not extra
         mount('/req/rw', False),                # wrong mode, but not extra
