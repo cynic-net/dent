@@ -60,24 +60,6 @@ class Config:
     tmpdir          : str|None
 
     @staticmethod
-    def x_from_args(**kwargs) -> 'Config':
-        use_keys = ['image']
-        use_args = { k: kwargs[k] for k in kwargs if k in use_keys and kwargs[k] is not None}
-        build_keys = ['base_image', 'force_rebuild', 'tag']
-        build_args = { k: kwargs[k] for k in kwargs if k in build_keys }
-        rem_args   = { k: kwargs[k] for k in kwargs
-                        if k not in use_keys + build_keys }
-        if use_args and build_args:
-            die('Conflicting args {} and {} specified.'
-                    .format(use_args.keys(), build_args.keys()))
-        print(build_args)
-        image_source:ImageSource = None
-        if   use_args:   image_source = UseImage(**use_args)
-        elif build_args: image_source = BuildImage(**build_args)
-        print(rem_args)
-        return Config(image_source=image_source, **rem_args)
-
-    @staticmethod
     def from_args(**args) -> 'Config':
         #   argparse always sets arguments; `None`/`False` indicates not given.
         for a in ('image', 'base_image', 'force_rebuild', 'tag'):
@@ -113,9 +95,7 @@ class Config:
         return Config(**(defaults|kwargs))
 
 ####################################################################
-#   Instead of a Config, parseargs() may return one of the following
-#   requests that main() do something entirely different from the standard
-#   Dent container entry.
+#   Actions that tell the program what to do.
 
 @dataclass(frozen=True)
 class PrintVersion: ...
@@ -133,9 +113,19 @@ class PrintFile:
     file        : Name
     base_image  : str|None      # the file contents depend on this
 
-ParseArgs = Config | PrintVersion | ListBaseImages | PrintFile
+@dataclass(frozen=True)
+class Enter:
+    ''' Not technically necessary, as we could just make this directly
+        a `Config`, but this better matches the "Action is a verb saying
+        what to do" format here, and Haskell's
+        ``data Action = Entry Config | PrintVersion | …``.
+    '''
 
-def parseargs(argv:list[str]|None=None) -> ParseArgs:
+    config      : Config
+
+Action = Enter | PrintVersion | ListBaseImages | PrintFile
+
+def action(argv:list[str]|None=None) -> Action:
     ''' Parse the command line, returning a `Command` for options that
         request something other than the standard container entry, or
         otherwise the `Config` describing that entry.
@@ -220,5 +210,4 @@ def parseargs(argv:list[str]|None=None) -> ParseArgs:
 
     args = vars(ns)
     del args['version'], args['list_base_images'], args['print_file']
-    conf = Config.from_args(**args)
-    return conf
+    return Enter(Config.from_args(**args))

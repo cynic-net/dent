@@ -2,27 +2,28 @@ from    dent.configure  import *
 import  pytest
 
 def test_parseargs_config():
-    conf = parseargs(['-B', 'debian:12', '-s', 'foo', 'mycont', 'echo', 'hi'])
-    assert isinstance(conf, Config)
-    assert isinstance(conf.image_source, BuildImage)
+    enter = action(['-B', 'debian:12', '-s', 'foo', 'mycont', 'echo', 'hi'])
+    assert isinstance(enter, Enter)
+    config = enter.config
+    assert isinstance(config.image_source, BuildImage)
     assert ('debian:12', 'mycont', ['echo', 'hi'], ['foo'], False) \
-        == (conf.image_source.base_image, conf.CONTAINER_NAME, conf.COMMAND,
-            conf.share_ro, conf.quiet)
+        == (config.image_source.base_image, config.CONTAINER_NAME,
+            config.COMMAND, config.share_ro, config.quiet)
 
 def test_parseargs_default_command():
-    conf = parseargs(['mycont'])
-    assert isinstance(conf, Config)
-    assert ['bash', '-l'] == conf.COMMAND
+    enter = action(['mycont'])
+    assert isinstance(enter, Enter)
+    assert ['bash', '-l'] == enter.config.COMMAND
 
 def test_parseargs_bad():
     cname = 'my-container-name'
     def bad_args():  return pytest.raises(SystemExit)
 
     #   Command line options that must not have a container name.
-    with bad_args():  parseargs(['--version', cname])
-    with bad_args():  parseargs(['--list-base-images', cname])
-    with bad_args():  parseargs(['-P', 'dockerfile', cname])
-    with bad_args():  parseargs(['--version', '-L'])
+    with bad_args():  action(['--version', cname])
+    with bad_args():  action(['--list-base-images', cname])
+    with bad_args():  action(['-P', 'dockerfile', cname])
+    with bad_args():  action(['--version', '-L'])
 
 #   -B and -i are alternative ways of specifying the image for a new
 #   container, and -R and -t configure only the image built from -B.
@@ -41,20 +42,20 @@ def test_parseargs_bad():
     ('image+tag',   False,  ['-i', 'img', '-t', 'tg']),
     ('image+rebuild',False, ['-i', 'img', '-R']),
 ])
-def test_parseargs_image_opts(_id, ok, opts):
+def test_action_image_opts(_id, ok, opts):
     argv = opts + ['mycont']
     if ok:
-        assert isinstance(parseargs(argv), Config)
+        assert isinstance(action(argv), Enter)
     else:
-        with pytest.raises(SystemExit):  parseargs(argv)
+        with pytest.raises(SystemExit):  action(argv)
 
-def test_parseargs_version():
-    assert PrintVersion() == parseargs(['--version'])
+def test_action_version():
+    assert PrintVersion() == action(['--version'])
 
-def test_parseargs_list_base_images():
-    assert ListBaseImages() == parseargs(['-L'])
+def test_action_list_base_images():
+    assert ListBaseImages() == action(['-L'])
 
-def test_parseargs_print_file():
+def test_action_print_file():
     assert PrintFile('dockerfile', 'debian:12') \
-        == parseargs(['-P', 'dockerfile', '-B', 'debian:12'])
-    assert PrintFile('setup-pkg', None) == parseargs(['-P', 'setup-pkg'])
+        == action(['-P', 'dockerfile', '-B', 'debian:12'])
+    assert PrintFile('setup-pkg', None) == action(['-P', 'setup-pkg'])
