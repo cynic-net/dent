@@ -77,8 +77,10 @@ class Config:
             image_source = UseImage(args['image'])
             del args['image']
 
-        if 'force_rebuild' in args:         die('-R requires -B')
-        if 'tag' in args:                   die('-t requires -B')
+        #   If `base_image` is not specified, `force_rebuild` and `tag` are
+        #   ignored, just as they are ignored when `base_image` is specified
+        #   but we don't force a rebuild.
+        args.pop('force_rebuild', None); args.pop('tag', None)
         return Config(image_source=image_source, **args)
 
 

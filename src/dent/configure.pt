@@ -37,8 +37,8 @@ def test_parseargs_bad():
     ('base+tag',    True,   ['-B', 'deb', '-t', 'tg']),
     ('base+rebuild',True,   ['-B', 'deb', '-R']),
     ('base+image',  False,  ['-B', 'deb', '-i', 'img']),
-    ('tag alone',   False,  ['-t', 'tg']),
-    ('rebuild alone',False, ['-R']),
+    ('tag alone',   True,  ['-t', 'tg']),
+    ('rebuild alone',True, ['-R']),
     ('image+tag',   False,  ['-i', 'img', '-t', 'tg']),
     ('image+rebuild',False, ['-i', 'img', '-R']),
 ])
