@@ -2,6 +2,9 @@ from    dent.configure  import *
 from    pathlib  import Path
 import  pytest
 
+####################################################################
+#   Specific Options Tests
+
 def test_parseargs_config():
     enter = action(['-B', 'debian:12', '-s', 'foo', 'mycont', 'echo', 'hi'])
     assert isinstance(enter, Enter)
@@ -10,6 +13,17 @@ def test_parseargs_config():
     assert ('debian:12', 'mycont', ['echo', 'hi'], ['foo'], False) \
         == (config.image_source.base_image, config.CONTAINER_NAME,
             config.COMMAND, config.share_ro, config.quiet)
+
+def test_action_version():
+    assert PrintVersion() == action(['--version'])
+
+def test_action_list_base_images():
+    assert ListBaseImages() == action(['-L'])
+
+def test_action_print_file():
+    assert PrintFile('dockerfile', 'debian:12') \
+        == action(['-P', 'dockerfile', '-B', 'debian:12'])
+    assert PrintFile('setup-pkg', None) == action(['-P', 'setup-pkg'])
 
 def test_parseargs_set_env():
     enter = action(['--set-env=FOO=bar', '--set-env=BAZ=', 'mycont'])
@@ -22,6 +36,9 @@ def test_parseargs_default_command():
     enter = action(['mycont'])
     assert isinstance(enter, Enter)
     assert ['bash', '-l'] == enter.config.COMMAND
+
+####################################################################
+#   Valid and invalid combinations of arguments
 
 def test_parseargs_bad():
     cname = 'my-container-name'
@@ -56,17 +73,6 @@ def test_action_image_opts(_id, ok, opts):
         assert isinstance(action(argv), Enter)
     else:
         with pytest.raises(SystemExit):  action(argv)
-
-def test_action_version():
-    assert PrintVersion() == action(['--version'])
-
-def test_action_list_base_images():
-    assert ListBaseImages() == action(['-L'])
-
-def test_action_print_file():
-    assert PrintFile('dockerfile', 'debian:12') \
-        == action(['-P', 'dockerfile', '-B', 'debian:12'])
-    assert PrintFile('setup-pkg', None) == action(['-P', 'setup-pkg'])
 
 ####################################################################
 #   Config comparison against existing containers
