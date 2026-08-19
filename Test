@@ -45,7 +45,7 @@ test_typecheck() {
 
 test_unittest() {
     echo '───── Unit tests'
-    pytest #"$@"        # default args in pyproject.toml.
+    pytest "$@"         # default args in pyproject.toml.
 }
 
 test_dryrun() {
