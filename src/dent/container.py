@@ -230,7 +230,7 @@ def create_container(conf:Config):
         commands or shells with ``docker exec`` in that existing container.
     '''
     shared_path_opts = [ '-v={0}:{0}:{1}'.format(p, 'rw' if rw else 'ro')
-                         for p, rw in conf.share_paths() ]
+                         for p, rw in conf.run_config.share_paths() ]
 
     share = dent_share(conf)
     (share / 'entry-script').mkdir(parents=True, exist_ok=True)

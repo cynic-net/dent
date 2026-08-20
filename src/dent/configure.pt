@@ -87,12 +87,11 @@ def test_action_image_opts(_id, ok, opts):
 
 def test_share_paths():
     home = Path.home()
-    conf = Config.testconfig(run_config=RunConfig(
-        share_ro=['/etc/foo', 'rel'], share_rw=['/home/bar']))
+    rc = RunConfig(share_ro=['/etc/foo', 'rel'], share_rw=['/home/bar'])
     assert [    (Path('/etc/foo'), False),
                 (home/'rel',       False),
                 (Path('/home/bar'), True),
-           ] == conf.share_paths()
+           ] == rc.share_paths()
 
 def mount(p, rw):
     ' A Mounts entry as found in `docker inspect` container output. '

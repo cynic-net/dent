@@ -125,6 +125,15 @@ class RunConfig:
     share_rw        : list[str]         = field(default_factory=list, metadata={
                     'help':'Read-write bind mount the given directories to the same paths inside the container. Relative paths are relative to $HOME.' })
 
+    def share_paths(self) -> list[tuple[Path,bool]]:
+        ''' Absolute paths of the `share_ro` and `share_rw` entries, each
+            paired with a writability flag. Relative paths are taken as
+            relative to `Path.home()`.
+        '''
+        home = Path.home()
+        return [ (home / s, False) for s in self.share_ro ] \
+             + [ (home / s, True)  for s in self.share_rw ]
+
 @dataclass
 class Config:
     ''' The program configuration for building and entering a container.
@@ -251,7 +260,7 @@ class Config:
                         for m in mounts )
         ms = [ 'existing container does not mount {} {}'
                     .format(p, 'read-write' if rw else 'read-only')
-                for p, rw in self.share_paths() if not mounted(p, rw) ]
+                for p, rw in self.run_config.share_paths() if not mounted(p, rw) ]
         #   For the Dent share only the host-side Source and writability
         #   matter: the in-container path may differ in older containers,
         #   which the dent-share script handles itself.
@@ -287,21 +296,13 @@ class Config:
             allowing suppression for regularly-used foreign images) they
             would nag on every entry that varies options from creation.
         '''
-        requested = { str(p) for p, _ in self.share_paths() } | { str(share) }
+        requested = { str(p) for p, _ in self.run_config.share_paths() } \
+            | { str(share) }
         return [ 'existing container also mounts {} {}'
                     .format(m['Destination'],
                         'read-write' if m.get('RW') else 'read-only')
                  for m in (inspect.get('Mounts') or [])
                  if dent_shared(m) and m.get('Destination') not in requested ]
-
-    def share_paths(self) -> list[tuple[Path,bool]]:
-        ''' Absolute paths of the `share_ro` and `share_rw` entries, each
-            paired with a writability flag. Relative paths are taken as
-            relative to `Path.home()`.
-        '''
-        home = Path.home()
-        return [ (home / s, False) for s in self.run_config.share_ro ] \
-             + [ (home / s, True)  for s in self.run_config.share_rw ]
 
     def extra_env(self):
         ''' Warnings for environment variables the existing container was
