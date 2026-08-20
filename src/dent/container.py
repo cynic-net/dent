@@ -39,7 +39,7 @@ def enter_container(conf:Config):
     else:   # container exists (but might not be started yet)
         if not_on_existing:
             die(not_on_existing_msg)
-        share = dent_share(conf)
+        share = conf.dent_share()
         for m in conf.mismatches(container, share):  warn(m)
         if not container['State']['Running']:
             docker.docker_container_start(conf)
@@ -48,7 +48,7 @@ def enter_container(conf:Config):
         #   entered directly. The Dent share is identified by the ``Source``
         #   path (i.e. path on the host); the in-container path is taken
         #   care of by the in-container ``dshare dir`` program.
-        has_share = has_bind(container, source=share)
+        has_share = conf.has_dent_share(container)
 
     waitforstart(conf)
 
@@ -135,32 +135,6 @@ def waitforstart(conf:Config):
 STARTUP_KEEP    = 12
 STARTUP_MIN_AGE = 120
 
-def dent_share(conf:Config) -> Path:
-    ''' For images/containers created by Dent, we create a *Dent share*: a
-        directory used to pass information back and forth (entry
-        initialisation code, copy/paste stuff, sockets, and anything the user
-        wants to share). It is bind-mounted at the same path in host and
-        container (which relies on their ``$HOME`` matching, as `share_args`
-        also assumes) and lives at ``dent/<container>`` under the standard XDG
-        state dir (``${XDG_STATE_HOME:-$HOME/.local/state}``); we use that
-        instead of ``$XDG_RUNTIME_DIR`` because containers often outlive the
-        session owning the runtime dir.
-
-        This must agree with the `dshare` script, which computes the
-        same path for the user inside and outside the container.
-    '''
-    state = os.environ.get('XDG_STATE_HOME') or Path.home()/'.local'/'state'
-    return Path(state) / 'dent' / conf.CONTAINER_NAME
-
-def has_bind(inspect:dict, *, source:Path) -> bool:
-    ''' Given the parsed ``docker inspect`` output for a container, return
-        `True` if the container binds `source` on the host side into the
-        container. (We don't check where in the container it is mounted.)
-    '''
-    #   Note that the ``Mounts`` entry may be absent or null.
-    return any( m.get('Source') == str(source) and m.get('Type') == 'bind'
-                for m in (inspect.get('Mounts') or []) )
-
 def write_entry_script(conf:Config) -> str:
     ''' At each entry write a startup script to be executed inside the
         container before the user's shell. This is intended to carry
@@ -176,7 +150,7 @@ def write_entry_script(conf:Config) -> str:
         will reap old files that are no longer needed by calling
         `reap_startup_files()`.
     '''
-    scriptdir = dent_share(conf) / 'entry-script'
+    scriptdir = conf.dent_share() / 'entry-script'
     scriptdir.mkdir(parents=True, exist_ok=True)
     now = datetime.now()
     fname = f'startup.{now.strftime("%Y%m%dT%H%M%S")}.{os.getpid()}'
@@ -232,7 +206,7 @@ def create_container(conf:Config):
     shared_path_opts = [ '-v={0}:{0}:{1}'.format(p, 'rw' if rw else 'ro')
                          for p, rw in conf.run_config.share_paths() ]
 
-    share = dent_share(conf)
+    share = conf.dent_share()
     (share / 'entry-script').mkdir(parents=True, exist_ok=True)
     dent_share_opt = '-v={0}:{0}'.format(share)
 

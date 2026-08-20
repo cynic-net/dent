@@ -5,6 +5,7 @@ from    dent.util import die
 from    argparse  import (
         ArgumentParser, REMAINDER, RawDescriptionHelpFormatter)
 from    dataclasses  import dataclass, fields, field
+from    os  import environ
 from    pathlib  import Path
 from    textwrap import dedent
 from    typing  import Literal, get_args
@@ -228,6 +229,37 @@ class Config:
     @staticmethod
     def add_arg_run_config(p:ArgumentParser) -> None:
         add_dataclass_args(p, RunConfig)
+
+    ####################################################################
+    #   dent_share
+
+    def dent_share(self) -> Path:
+        ''' For images/containers created by Dent, we create a *Dent share*: a
+            directory used to pass information back and forth (entry
+            initialisation code, copy/paste stuff, sockets, and anything the user
+            wants to share). It is bind-mounted at the same path in host and
+            container (which relies on their ``$HOME`` matching, as `share_args`
+            also assumes) and lives at ``dent/<container>`` under the standard XDG
+            state dir (``${XDG_STATE_HOME:-$HOME/.local/state}``); we use that
+            instead of ``$XDG_RUNTIME_DIR`` because containers often outlive the
+            session owning the runtime dir.
+
+            This must agree with the `dshare` script, which computes the
+            same path for the user inside and outside the container.
+        '''
+        state = environ.get('XDG_STATE_HOME') or Path.home()/'.local'/'state'
+        return Path(state) / 'dent' / self.CONTAINER_NAME
+
+    def has_dent_share(self, inspect:dict) -> bool:
+        ''' Given the parsed ``docker inspect`` output for a container, return
+            `True` if the container binds `dent_share()` on the host side
+            into the container. (We don't check where in the container it
+            is mounted.)
+        '''
+        #   Note that the ``Mounts`` entry may be absent or null.
+        return any( m.get('Source') == str(self.dent_share())
+                        and m.get('Type') == 'bind'
+                    for m in (inspect.get('Mounts') or []) )
 
     ####################################################################
     #   Configuration matching
