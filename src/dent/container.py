@@ -40,7 +40,7 @@ def enter_container(conf:Config):
         if not_on_existing:
             die(not_on_existing_msg)
         share = dent_share(conf)
-        for m in conf.container_mismatches(container, share):  warn(m)
+        for m in conf.mismatches(container, share):  warn(m)
         if not container['State']['Running']:
             docker.docker_container_start(conf)
         #   Only containers created with the shared dir get the startup-file

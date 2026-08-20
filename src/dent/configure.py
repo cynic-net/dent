@@ -232,23 +232,26 @@ class Config:
     ####################################################################
     #   Configuration matching
 
-    def container_mismatches(self, inspect:dict, share:Path) -> list[str]:
+    def mismatches(self, inspect:dict, share:Path) -> list[str]:
         ''' Return warnings describing how this container differs from the
             configuration requested for this container. (These are normally
             displayed as warnings, just to let you know you might want to
             rebuild.)
+            `inspect` is the parsed output of ``docker inspect``.
+            `share` is the `Path` to the dent share.
         '''
-        ms  = self.mount_mismatches(inspect, share)
-        ms += self.env_mismatches(inspect)
+        #   XXX should the dent share path not be part of this Config?
+        ms  = self.mismatches_mounts(inspect, share)
+        ms += self.mismatches_set_env(inspect)
         #   XXX Enable these once we have config files to hold the options
         #   that would suppress the messages; otherwise we have to write
         #   the whole creation command line every time.
         #ms += self.extra_mounts(inspect, share)
-        #ms += self.extra_env(...)
+        #ms += self.extra_set_env(...)
         #ms += self.image_mismatches(...)
         return ms
 
-    def mount_mismatches(self, inspect:dict, share:Path) -> list[str]:
+    def mismatches_mounts(self, inspect:dict, share:Path) -> list[str]:
         ''' Warnings for configured shares that are not bind-mounted at the
             same path in the container with the requested writability, and
             for the Dent share when not mounted read-write from `share` on
@@ -269,19 +272,6 @@ class Config:
             ms.append('existing container does not mount the Dent share {}'
                 ' read-write'.format(share))
         return ms
-
-    def env_mismatches(self, inspect:dict) -> list[str]:
-        ''' Warnings for configured environment variables (`set_env`) that
-            the existing container described by the ``docker inspect``
-            output `inspect` was not created with, per its ``Config.Env``.
-        '''
-        env = { k: v for k, v in
-                ( kv.split('=', 1)
-                  for kv in (inspect.get('Config') or {}).get('Env') or []
-                  if '=' in kv ) }
-        return [ 'existing container does not set {}={}'.format(k, v)
-                 for k, v in sorted(self.run_config.set_env.items())
-                 if env.get(k) != v ]
 
     def extra_mounts(self, inspect:dict, share:Path) -> list[str]:
         ''' Descriptions of mounts in the existing container described by
@@ -304,7 +294,20 @@ class Config:
                  for m in (inspect.get('Mounts') or [])
                  if dent_shared(m) and m.get('Destination') not in requested ]
 
-    def extra_env(self):
+    def mismatches_set_env(self, inspect:dict) -> list[str]:
+        ''' Warnings for configured environment variables (`set_env`) that
+            the existing container described by the ``docker inspect``
+            output `inspect` was not created with, per its ``Config.Env``.
+        '''
+        env = { k: v for k, v in
+                ( kv.split('=', 1)
+                  for kv in (inspect.get('Config') or {}).get('Env') or []
+                  if '=' in kv ) }
+        return [ 'existing container does not set {}={}'.format(k, v)
+                 for k, v in sorted(self.run_config.set_env.items())
+                 if env.get(k) != v ]
+
+    def extra_set_env(self):
         ''' Warnings for environment variables the existing container was
             created with but that this configuration does not request.
         '''
@@ -313,10 +316,10 @@ class Config:
         #   variables from the image's own ENV and those Dent itself sets
         #   at creation (DENT_CONTAINER, LOGNAME, USER, XDG_*, etc.). So
         #   this needs the *image's* Config.Env (from the image inspection
-        #   that image_mismatches() will also need) to subtract, plus an
+        #   that mismatches_image() will also need) to subtract, plus an
         #   exclusion list of Dent's own variables.
 
-    def image_mismatches(self):
+    def mismatches_image(self):
         ''' Check that the base-images's layers are a prefix of the
             container's image's layers.
         '''
